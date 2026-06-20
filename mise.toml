@@ -17,7 +17,15 @@ run = "node tests/smoke.mjs"
 description = "Serve the static site locally"
 run = "python3 -m http.server 8000"
 
+[tasks.configure-production-branch]
+description = "Set the Cloudflare Pages production branch"
+run = """secretspec run -- curl --fail --silent --show-error --request PATCH "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$CLOUDFLARE_PAGES_PROJECT" --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" --header "Content-Type: application/json" --data '{"production_branch":"main"}'"""
+
+[tasks.pages-projects]
+description = "List Cloudflare Pages projects visible to the configured credentials"
+run = "secretspec run -- npx wrangler pages project list"
+
 [tasks.deploy]
 description = "Validate, sync, and deploy to Cloudflare Pages"
-depends = ["check", "sync-public"]
-run = "secretspec run -- npx wrangler pages deploy public --project-name=weatherman"
+depends = ["check", "sync-public", "configure-production-branch"]
+run = "secretspec run -- npx wrangler pages deploy public --project-name=$CLOUDFLARE_PAGES_PROJECT --branch=main"
