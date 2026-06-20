@@ -3,6 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f766e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Weather Median">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <title>Hungary Weather Median</title>
   <style>
     :root {
@@ -508,13 +513,6 @@
     <section class="panel">
       <div class="map-head">
         <h2 id="mapTitle">Radar Map</h2>
-        <label>
-          <span id="mapLayerLabel">Layer</span>
-          <select id="mapLayer">
-            <option value="wind">Wind direction</option>
-            <option value="clouds">Cloud coverage</option>
-          </select>
-        </label>
       </div>
       <iframe class="map-frame" id="weatherMap" title="Windy weather map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       <p class="note" id="mapNote">Visual Windy layer only. It is not part of the median forecast calculation.</p>
@@ -599,10 +597,6 @@
       CAUTION: "caution",
       POOR: "poor"
     });
-    const MAP_LAYER = Object.freeze({
-      WIND: "wind",
-      CLOUDS: "clouds"
-    });
     const ADVISORY_DOMAIN = Object.freeze({
       AGRI: "agri",
       FAMILY: "family"
@@ -610,7 +604,6 @@
     const SUPPORTED_LOCALES = Object.freeze([LOCALE.EN_GB, LOCALE.HU_HU]);
     const SUPPORTED_CROPS = Object.freeze(Object.values(CROP));
     const SUPPORTED_WORK = Object.freeze(Object.values(WORK));
-    const SUPPORTED_MAP_LAYERS = Object.freeze(Object.values(MAP_LAYER));
     const SUPPORTED_ADVISORY_DOMAINS = Object.freeze(Object.values(ADVISORY_DOMAIN));
     const COORD_LIMITS = Object.freeze({
       LAT_MIN: -90,
@@ -695,7 +688,6 @@
     const language = document.querySelector("#language");
     const crop = document.querySelector("#crop");
     const work = document.querySelector("#work");
-    const mapLayer = document.querySelector("#mapLayer");
     const agriTab = document.querySelector("#agriTab");
     const familyTab = document.querySelector("#familyTab");
     const agriPanel = document.querySelector("#agriPanel");
@@ -721,10 +713,7 @@
         hourly: "Hourly Work Window",
         hourlyNote: "Hourly median for the next 48 hours. Shaded 6-hour windows use the selected crop and work rules.",
         map: "Radar Map",
-        mapLayer: "Layer",
         mapNote: "Visual Windy layer only. It is not part of the median forecast calculation.",
-        windDirection: "Wind direction",
-        cloudCoverage: "Cloud coverage",
         advisories: "Advisories",
         agriculture: "Agricultural Work",
         family: "Family",
@@ -822,10 +811,7 @@
         hourly: "Óránkénti munkablak",
         hourlyNote: "Óránkénti medián a következő 48 órára. Az árnyékolt 6 órás ablakok a kiválasztott kultúra és munka szabályait használják.",
         map: "Radartérkép",
-        mapLayer: "Réteg",
         mapNote: "Csak vizuális Windy réteg. Nem része a medián előrejelzés számításának.",
-        windDirection: "Szélirány",
-        cloudCoverage: "Felhőzet",
         advisories: "Tanácsok",
         agriculture: "Mezőgazdasági munka",
         family: "Család",
@@ -927,7 +913,7 @@
     agriTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.AGRI, true));
     familyTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.FAMILY, true));
 
-    [language, crop, work, mapLayer].forEach(control => {
+    [language, crop, work].forEach(control => {
       control.addEventListener("change", () => {
         applyStaticText();
         updateMap();
@@ -938,7 +924,13 @@
 
     if (!loadSettings()) applyBrowserLocale();
     applyStaticText();
+    registerServiceWorker();
     loadWeather();
+
+    function registerServiceWorker() {
+      if (!("serviceWorker" in navigator)) return;
+      navigator.serviceWorker.register("service-worker.js").catch(() => {});
+    }
 
     function t() {
       const locale = SUPPORTED_LOCALES.includes(language.value) ? language.value : LOCALE.EN_GB;
@@ -955,7 +947,6 @@
         if (selectHasValue(language, settings.language)) language.value = settings.language;
         if (selectHasValue(crop, settings.crop)) crop.value = settings.crop;
         if (selectHasValue(work, settings.work)) work.value = settings.work;
-        if (selectHasValue(mapLayer, settings.mapLayer)) mapLayer.value = settings.mapLayer;
         if (SUPPORTED_ADVISORY_DOMAINS.includes(settings.advisoryDomain)) setActiveDomain(settings.advisoryDomain);
         return true;
       } catch {
@@ -974,7 +965,6 @@
           language: language.value,
           crop: crop.value,
           work: work.value,
-          mapLayer: mapLayer.value,
           advisoryDomain: currentAdvisoryDomain()
         }));
       } catch {
@@ -1006,7 +996,6 @@
       document.querySelector("#hourlyTitle").textContent = strings.hourly;
       document.querySelector("#hourlyNote").textContent = strings.hourlyNote;
       document.querySelector("#mapTitle").textContent = strings.map;
-      document.querySelector("#mapLayerLabel").textContent = strings.mapLayer;
       document.querySelector("#mapNote").textContent = strings.mapNote;
       document.querySelector("#advisoryTitle").textContent = strings.advisories;
       agriTab.textContent = strings.agriculture;
@@ -1018,7 +1007,6 @@
       document.querySelector("#familyNote").textContent = strings.familyNote;
       updateOptionLabels(crop, SUPPORTED_CROPS);
       updateOptionLabels(work, SUPPORTED_WORK);
-      updateMapLayerLabels();
     }
 
     function updateOptionLabels(select, values) {
@@ -1059,15 +1047,9 @@
       return familyTab.classList.contains("active") ? ADVISORY_DOMAIN.FAMILY : ADVISORY_DOMAIN.AGRI;
     }
 
-    function updateMapLayerLabels() {
-      mapLayer.querySelector(`option[value="${MAP_LAYER.WIND}"]`).textContent = t().windDirection;
-      mapLayer.querySelector(`option[value="${MAP_LAYER.CLOUDS}"]`).textContent = t().cloudCoverage;
-    }
-
     function updateMap() {
       const coords = readCoords();
       if (!coords) return;
-      const layer = SUPPORTED_MAP_LAYERS.includes(mapLayer.value) ? mapLayer.value : MAP_LAYER.WIND;
       const params = new URLSearchParams({
         lat: coords.lat.toFixed(4),
         lon: coords.lon.toFixed(4),
@@ -1077,7 +1059,7 @@
         height: "450",
         zoom: "8",
         level: "surface",
-        overlay: layer,
+        overlay: "clouds",
         product: "ecmwf",
         menu: "",
         message: "true",

@@ -6,8 +6,8 @@ description = "Validate that the page script parses"
 run = "node -e \"const fs=require('fs'); const html=fs.readFileSync('index.html','utf8'); const m=html.match(/<script>([\\s\\S]*)<\\/script>/); if(!m) throw new Error('script tag not found'); new Function(m[1]); console.log('script parses')\""
 
 [tasks.sync-public]
-description = "Copy the single-page app into the Cloudflare Pages publish directory"
-run = "mkdir -p public && cp index.html public/index.html"
+description = "Copy the installable web app into the Cloudflare Pages publish directory"
+run = "mkdir -p public/icons && cp index.html public/index.html && cp manifest.webmanifest service-worker.js public/ && cp icons/icon-192.png icons/icon-512.png public/icons/"
 
 [tasks.smoke]
 description = "Run a dependency-free page initialisation smoke test"
@@ -27,5 +27,5 @@ run = "secretspec run -- npx wrangler pages project list"
 
 [tasks.deploy]
 description = "Validate, sync, and deploy to Cloudflare Pages"
-depends = ["check", "sync-public", "configure-production-branch"]
-run = "secretspec run -- npx wrangler pages deploy public --project-name=$CLOUDFLARE_PAGES_PROJECT --branch=main"
+depends = ["check", "sync-public"]
+run = "secretspec run -- sh -c 'npx wrangler pages deploy public --project-name=\"${CLOUDFLARE_PAGES_PROJECT:-weatherman}\" --branch=main'"

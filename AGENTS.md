@@ -20,6 +20,7 @@ Use mise for routine operations:
 - `mise run sync-public` copies `index.html` to `public/index.html`.
 - `mise run serve` serves the app locally on port `8000`.
 - `mise run deploy` runs validation, syncs the publish file, and deploys `public/` to Cloudflare Pages.
+- `mise run configure-production-branch` is a separate Cloudflare Pages configuration task. Do not include it in routine deploys.
 
 The app has no package build step. Avoid adding one unless it directly solves a project requirement.
 
