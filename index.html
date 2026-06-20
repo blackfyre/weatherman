@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0f766e">
+  <meta name="theme-color" content="#0f766e" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Weather Median">
   <link rel="manifest" href="manifest.webmanifest">
@@ -19,9 +20,41 @@
       --line: #d8dee6;
       --accent: #0f766e;
       --accent-soft: #d9f3ef;
+      --card: #fbfcfd;
+      --pill: #eef2f5;
+      --good-soft: #e4f4e8;
+      --warn-soft: #fff4d6;
+      --bad-soft: #fff0ec;
+      --highlight: #eefbf8;
+      --highlight-line: #b6d8d3;
+      --map-bg: #d8dee6;
       --warn: #a15c00;
       --bad: #b42318;
       --good: #137333;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        color-scheme: dark;
+        --bg: #0f172a;
+        --panel: #172033;
+        --ink: #e5edf6;
+        --muted: #9ba8ba;
+        --line: #334155;
+        --accent: #2dd4bf;
+        --accent-soft: #123f3d;
+        --card: #111827;
+        --pill: #233044;
+        --good-soft: #12351f;
+        --warn-soft: #3d2b0a;
+        --bad-soft: #3f1d1a;
+        --highlight: #123331;
+        --highlight-line: #1f6f67;
+        --map-bg: #1f2937;
+        --warn: #fbbf24;
+        --bad: #f87171;
+        --good: #4ade80;
+      }
     }
 
     * {
@@ -151,7 +184,7 @@
 
     .pill {
       border-radius: 999px;
-      background: #eef2f5;
+      background: var(--pill);
       color: var(--muted);
       font-size: 13px;
       padding: 5px 10px;
@@ -159,11 +192,11 @@
 
     .pill.ok {
       background: var(--accent-soft);
-      color: #075c55;
+      color: var(--accent);
     }
 
     .pill.bad {
-      background: #fff0ec;
+      background: var(--bad-soft);
       color: var(--bad);
     }
 
@@ -178,7 +211,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 14px;
-      background: #fbfcfd;
+      background: var(--card);
     }
 
     .metric span {
@@ -214,16 +247,16 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 12px;
-      background: #fbfcfd;
+      background: var(--card);
     }
 
     .family-highlight {
-      border: 1px solid #b6d8d3;
+      border: 1px solid var(--highlight-line);
       border-left: 5px solid var(--accent);
       border-radius: 8px;
       padding: 14px;
       margin-bottom: 12px;
-      background: #eefbf8;
+      background: var(--highlight);
     }
 
     .family-highlight-head {
@@ -273,17 +306,17 @@
     }
 
     .score.good {
-      background: #e4f4e8;
+      background: var(--good-soft);
       color: var(--good);
     }
 
     .score.caution {
-      background: #fff4d6;
+      background: var(--warn-soft);
       color: var(--warn);
     }
 
     .score.poor {
-      background: #fff0ec;
+      background: var(--bad-soft);
       color: var(--bad);
     }
 
@@ -311,7 +344,7 @@
       border-left-width: 5px;
       border-radius: 8px;
       padding: 10px 12px;
-      background: #fbfcfd;
+      background: var(--card);
       font-size: 13px;
     }
 
@@ -346,7 +379,7 @@
     .tab-button {
       min-height: 36px;
       border-color: var(--line);
-      background: #eef2f5;
+      background: var(--pill);
       color: var(--ink);
     }
 
@@ -379,7 +412,7 @@
       min-height: 360px;
       border: 1px solid var(--line);
       border-radius: 8px;
-      background: #d8dee6;
+      background: var(--map-bg);
     }
 
     .day dl,
@@ -412,7 +445,7 @@
       border: 1px solid var(--line);
       border-radius: 8px;
       padding: 12px;
-      background: #fbfcfd;
+      background: var(--card);
     }
 
     .provider .error {
