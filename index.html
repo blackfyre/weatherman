@@ -132,6 +132,11 @@
       padding: 16px;
     }
 
+    .advisory-panel .toolbar {
+      justify-content: flex-start;
+      margin-bottom: 12px;
+    }
+
     .status {
       display: flex;
       flex-wrap: wrap;
@@ -341,6 +346,7 @@
     }
 
     .day dl,
+    .agri-card dl,
     .providers dl {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -483,23 +489,6 @@
             <option value="hu-HU">Magyar</option>
           </select>
         </label>
-        <label>
-          <span id="cropLabel">Crop</span>
-          <select id="crop">
-            <option value="rapeseed">Rapeseed</option>
-            <option value="wheat">Wheat</option>
-            <option value="barley">Barley</option>
-            <option value="corn">Corn</option>
-            <option value="sunflower">Sunflower</option>
-          </select>
-        </label>
-        <label>
-          <span id="workLabel">Work</span>
-          <select id="work">
-            <option value="seeding">Seeding</option>
-            <option value="harvesting">Harvesting</option>
-          </select>
-        </label>
         <button id="refresh" type="submit">Refresh</button>
       </form>
     </header>
@@ -539,6 +528,25 @@
       </div>
 
       <div class="advisory-panel" id="agriPanel" role="tabpanel" aria-labelledby="agriTab">
+        <div class="toolbar">
+          <label>
+            <span id="cropLabel">Crop</span>
+            <select id="crop">
+              <option value="rapeseed">Rapeseed</option>
+              <option value="wheat">Wheat</option>
+              <option value="barley">Barley</option>
+              <option value="corn">Corn</option>
+              <option value="sunflower">Sunflower</option>
+            </select>
+          </label>
+          <label>
+            <span id="workLabel">Work</span>
+            <select id="work">
+              <option value="seeding">Seeding</option>
+              <option value="harvesting">Harvesting</option>
+            </select>
+          </label>
+        </div>
         <h3 id="hourlyTitle">Hourly Work Window</h3>
         <div class="hourly-chart-wrap">
           <canvas id="hourlyChart"></canvas>
@@ -570,7 +578,7 @@
   <script>
     const zone = "Europe/Budapest";
     const forecastDays = 5;
-    const openMeteoHourly = "temperature_2m,precipitation,wind_speed_10m,cloud_cover";
+    const openMeteoHourly = "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover";
     const LOCALE = Object.freeze({
       EN_GB: "en-GB",
       HU_HU: "hu-HU"
@@ -595,10 +603,15 @@
       WIND: "wind",
       CLOUDS: "clouds"
     });
+    const ADVISORY_DOMAIN = Object.freeze({
+      AGRI: "agri",
+      FAMILY: "family"
+    });
     const SUPPORTED_LOCALES = Object.freeze([LOCALE.EN_GB, LOCALE.HU_HU]);
     const SUPPORTED_CROPS = Object.freeze(Object.values(CROP));
     const SUPPORTED_WORK = Object.freeze(Object.values(WORK));
     const SUPPORTED_MAP_LAYERS = Object.freeze(Object.values(MAP_LAYER));
+    const SUPPORTED_ADVISORY_DOMAINS = Object.freeze(Object.values(ADVISORY_DOMAIN));
     const COORD_LIMITS = Object.freeze({
       LAT_MIN: -90,
       LAT_MAX: 90,
@@ -631,7 +644,7 @@
     });
     const SETTINGS_KEY = "weatherman.settings.v1";
     // Provider adapters map raw API payloads into this canonical hourly shape:
-    // { key, date, temp, precip, wind, cloud } with Budapest-local time and metric units.
+    // { key, date, temp, precip, wind, windDirection, cloud } with Budapest-local time and metric units.
     const providers = [
       {
         id: PROVIDER_ID.ECMWF,
@@ -731,6 +744,7 @@
         dailyTotal: "Median daily total",
         wind: "Wind",
         dailyMax: "Median daily max",
+        rulingWindDirection: "Ruling direction",
         chartUnavailable: "Chart library unavailable.",
         tempChart: "Temperature",
         rainChart: "Rain",
@@ -831,6 +845,7 @@
         dailyTotal: "Medián napi összeg",
         wind: "Szél",
         dailyMax: "Medián napi maximum",
+        rulingWindDirection: "Uralkodó irány",
         chartUnavailable: "A diagramkönyvtár nem elérhető.",
         tempChart: "Hőmérséklet",
         rainChart: "Eső",
@@ -907,8 +922,8 @@
     });
 
     locateButton.addEventListener("click", useBrowserLocation);
-    agriTab.addEventListener("click", () => setActiveDomain("agri"));
-    familyTab.addEventListener("click", () => setActiveDomain("family"));
+    agriTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.AGRI, true));
+    familyTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.FAMILY, true));
 
     [language, crop, work, mapLayer].forEach(control => {
       control.addEventListener("change", () => {
@@ -939,6 +954,7 @@
         if (selectHasValue(crop, settings.crop)) crop.value = settings.crop;
         if (selectHasValue(work, settings.work)) work.value = settings.work;
         if (selectHasValue(mapLayer, settings.mapLayer)) mapLayer.value = settings.mapLayer;
+        if (SUPPORTED_ADVISORY_DOMAINS.includes(settings.advisoryDomain)) setActiveDomain(settings.advisoryDomain);
         return true;
       } catch {
         return false;
@@ -956,7 +972,8 @@
           language: language.value,
           crop: crop.value,
           work: work.value,
-          mapLayer: mapLayer.value
+          mapLayer: mapLayer.value,
+          advisoryDomain: currentAdvisoryDomain()
         }));
       } catch {
         // localStorage may be disabled; the page remains usable without persistence.
@@ -1024,8 +1041,8 @@
       if (lastAggregate) renderAll(lastResults, lastAggregate);
     }
 
-    function setActiveDomain(domain) {
-      const familyActive = domain === "family";
+    function setActiveDomain(domain, persist = false) {
+      const familyActive = domain === ADVISORY_DOMAIN.FAMILY;
       agriTab.classList.toggle("active", !familyActive);
       familyTab.classList.toggle("active", familyActive);
       agriTab.setAttribute("aria-selected", String(!familyActive));
@@ -1033,6 +1050,11 @@
       agriPanel.hidden = familyActive;
       familyPanel.hidden = !familyActive;
       if (!familyActive && hourlyChart) hourlyChart.resize();
+      if (persist) saveSettings();
+    }
+
+    function currentAdvisoryDomain() {
+      return familyTab.classList.contains("active") ? ADVISORY_DOMAIN.FAMILY : ADVISORY_DOMAIN.AGRI;
     }
 
     function updateMapLayerLabels() {
@@ -1223,6 +1245,7 @@
         temp: valueAt(hourly.temperature_2m, index),
         precip: valueAt(hourly.precipitation, index),
         wind: valueAt(hourly.wind_speed_10m, index),
+        windDirection: valueAt(hourly.wind_direction_10m, index),
         cloud: valueAt(hourly.cloud_cover, index)
       }));
     }
@@ -1238,6 +1261,7 @@
           temp: numberOrNull(details.air_temperature),
           precip: numberOrNull(nextHour.precipitation_amount),
           wind: numberOrNull(details.wind_speed) === null ? null : details.wind_speed * 3.6,
+          windDirection: numberOrNull(details.wind_from_direction),
           cloud: numberOrNull(details.cloud_area_fraction)
         };
       });
@@ -1268,6 +1292,7 @@
         low: min(hours.map(hour => hour.temp)),
         precip: sum(hours.map(hour => hour.precip)),
         wind: max(hours.map(hour => hour.wind)),
+        windDirection: prevailingDirection(hours.map(hour => hour.windDirection)),
         cloud: median(hours.map(hour => hour.cloud))
       }));
     }
@@ -1281,6 +1306,7 @@
         low: median(providerDays.map(day => day.low)),
         precip: median(providerDays.map(day => day.precip)),
         wind: median(providerDays.map(day => day.wind)),
+        windDirection: prevailingDirection(providerDays.map(day => day.windDirection)),
         cloud: median(providerDays.map(day => day.cloud))
       };
     }
@@ -1305,6 +1331,7 @@
           temp: median(hours.map(hour => hour.temp)),
           precip: median(hours.map(hour => hour.precip)),
           wind: median(hours.map(hour => hour.wind)),
+          windDirection: prevailingDirection(hours.map(hour => hour.windDirection)),
           cloud: median(hours.map(hour => hour.cloud))
         }));
     }
@@ -1322,6 +1349,7 @@
           low: min(slice.map(hour => hour.temp)),
           precip: sum(slice.map(hour => hour.precip)),
           wind: max(slice.map(hour => hour.wind)),
+          windDirection: prevailingDirection(slice.map(hour => hour.windDirection)),
           cloud: median(slice.map(hour => hour.cloud))
         };
         windows.push({
@@ -1357,7 +1385,7 @@
         metricMarkup(strings.now, formatTemp(day.currentTemp), strings.activeSources(sourceCount)),
         metricMarkup(strings.highLow, `${formatTemp(day.high)} / ${formatTemp(day.low)}`, strings.dailyRange),
         metricMarkup(strings.precipitation, formatMm(day.precip), strings.dailyTotal),
-        metricMarkup(strings.wind, formatKmh(day.wind), strings.dailyMax)
+        metricMarkup(strings.wind, formatKmh(day.wind), `${strings.dailyMax} · ${formatWindDirection(day.windDirection)}`)
       ].join("");
     }
 
@@ -1370,6 +1398,7 @@
           <dl>
             <dt>${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
             <dt>${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
+            <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
             <dt>${strings.cloud}</dt><dd>${formatPercent(day.cloud)}</dd>
             <dt>${strings.sourceCount}</dt><dd>${day.sources}</dd>
           </dl>
@@ -1424,7 +1453,7 @@
             }
           ]
         },
-        options: hourlyChartOptions(strings, windows),
+        options: hourlyChartOptions(strings, windows, hours),
         plugins: [workWindowBands]
       });
     }
@@ -1439,7 +1468,7 @@
       `).join("");
     }
 
-    function hourlyChartOptions(strings, windows) {
+    function hourlyChartOptions(strings, windows, hours) {
       return {
         responsive: true,
         maintainAspectRatio: false,
@@ -1455,7 +1484,11 @@
             callbacks: {
               afterBody(items) {
                 const window = windows.find(candidate => items[0].dataIndex >= candidate.start && items[0].dataIndex <= candidate.end);
-                return window ? `${strings.workWindow}: ${strings[window.evaluation.level]}` : "";
+                const hour = hours[items[0].dataIndex];
+                return [
+                  `${strings.rulingWindDirection}: ${formatWindDirection(hour?.windDirection)}`,
+                  window ? `${strings.workWindow}: ${strings[window.evaluation.level]}` : ""
+                ].filter(Boolean);
               }
             }
           },
@@ -1545,6 +1578,10 @@
             <time datetime="${day.date}">${formatDate(day.date)}</time>
             <h3>${strings[crop.value]} - ${strings[work.value]}</h3>
             <span class="score ${evaluation.level}">${strings[evaluation.level]}</span>
+            <dl>
+              <dt>${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
+              <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
+            </dl>
             <ul class="reasons">
               ${evaluation.reasons.map(reason => `<li>${escapeHtml(strings.reasons[reason])}</li>`).join("")}
             </ul>
@@ -1714,6 +1751,7 @@
               <dt>${strings.low}</dt><dd>${formatTemp(today?.low)}</dd>
               <dt>${strings.rain}</dt><dd>${formatMm(today?.precip)}</dd>
               <dt>${strings.wind}</dt><dd>${formatKmh(today?.wind)}</dd>
+              <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(today?.windDirection)}</dd>
             </dl>
           </article>
         `;
@@ -1778,6 +1816,18 @@
       return clean.length ? clean.reduce((total, value) => total + value, 0) : null;
     }
 
+    function prevailingDirection(values) {
+      const clean = values.filter(value => Number.isFinite(value));
+      if (!clean.length) return null;
+      const sectors = Array(8).fill(0);
+      clean.forEach(value => {
+        const index = Math.round((((value % 360) + 360) % 360) / 45) % 8;
+        sectors[index] += 1;
+      });
+      const winningIndex = sectors.indexOf(Math.max(...sectors));
+      return winningIndex * 45;
+    }
+
     function valueAt(values, index) {
       return numberOrNull(Array.isArray(values) ? values[index] : null);
     }
@@ -1832,6 +1882,15 @@
         hour: "2-digit"
       });
       return `${format.format(new Date(startKey))} - ${format.format(new Date(endKey))}`;
+    }
+
+    function formatWindDirection(value) {
+      if (!Number.isFinite(value)) return "n/a";
+      const labels = language.value === LOCALE.HU_HU
+        ? ["É", "ÉK", "K", "DK", "D", "DNY", "NY", "ÉNY"]
+        : ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+      const index = Math.round((((value % 360) + 360) % 360) / 45) % 8;
+      return labels[index];
     }
 
     function formatTemp(value) {

@@ -35,7 +35,7 @@ There is no formal test framework yet. At minimum, run `mise run check` before d
 
 ## Commit & Pull Request Guidelines
 
-This checkout has no git history available, so no existing commit convention can be inferred. Use short imperative commit messages, for example `Add barley crop rules` or `Document deployment tasks`.
+Use Conventional Commits for commit messages, for example `feat: add barley crop rules` or `docs: document deployment tasks`.
 
 Pull requests should describe the user-visible change, list manual checks performed, and include screenshots for visual changes.
 
