@@ -1,0 +1,23 @@
+[tools]
+"github:cachix/secretspec" = "latest"
+
+[tasks.check]
+description = "Validate that the page script parses"
+run = "node -e \"const fs=require('fs'); const html=fs.readFileSync('index.html','utf8'); const m=html.match(/<script>([\\s\\S]*)<\\/script>/); if(!m) throw new Error('script tag not found'); new Function(m[1]); console.log('script parses')\""
+
+[tasks.sync-public]
+description = "Copy the single-page app into the Cloudflare Pages publish directory"
+run = "mkdir -p public && cp index.html public/index.html"
+
+[tasks.smoke]
+description = "Run a dependency-free page initialisation smoke test"
+run = "node tests/smoke.mjs"
+
+[tasks.serve]
+description = "Serve the static site locally"
+run = "python3 -m http.server 8000"
+
+[tasks.deploy]
+description = "Validate, sync, and deploy to Cloudflare Pages"
+depends = ["check", "sync-public"]
+run = "secretspec run -- npx wrangler pages deploy public --project-name=weatherman"

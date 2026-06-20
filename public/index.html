@@ -1,0 +1,1867 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hungary Weather Median</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7f8;
+      --panel: #ffffff;
+      --ink: #1f2933;
+      --muted: #657181;
+      --line: #d8dee6;
+      --accent: #0f766e;
+      --accent-soft: #d9f3ef;
+      --warn: #a15c00;
+      --bad: #b42318;
+      --good: #137333;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.45;
+    }
+
+    main {
+      width: min(1180px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 40px;
+    }
+
+    header {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 18px;
+      align-items: end;
+      margin-bottom: 20px;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 32px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    h2 {
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 15px;
+    }
+
+    .subtle {
+      color: var(--muted);
+      font-size: 14px;
+      margin-top: 8px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    label {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    input,
+    select,
+    button {
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--ink);
+      font: inherit;
+    }
+
+    input,
+    select {
+      width: 126px;
+      padding: 0 10px;
+    }
+
+    button {
+      align-self: end;
+      padding: 0 14px;
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      cursor: wait;
+      opacity: .75;
+    }
+
+    section {
+      margin-top: 16px;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .status {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .pill {
+      border-radius: 999px;
+      background: #eef2f5;
+      color: var(--muted);
+      font-size: 13px;
+      padding: 5px 10px;
+    }
+
+    .pill.ok {
+      background: var(--accent-soft);
+      color: #075c55;
+    }
+
+    .pill.bad {
+      background: #fff0ec;
+      color: var(--bad);
+    }
+
+    .today-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric {
+      min-height: 112px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px;
+      background: #fbfcfd;
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+
+    .metric strong {
+      display: block;
+      font-size: 30px;
+      line-height: 1;
+    }
+
+    .metric small {
+      display: block;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    .forecast-grid,
+    .agri-grid,
+    .family-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 10px;
+    }
+
+    .day,
+    .agri-card,
+    .family-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfd;
+    }
+
+    .day time {
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .day strong {
+      display: block;
+      font-size: 23px;
+      margin-top: 8px;
+    }
+
+    .score {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 13px;
+      font-weight: 800;
+      margin-top: 10px;
+    }
+
+    .score.good {
+      background: #e4f4e8;
+      color: var(--good);
+    }
+
+    .score.caution {
+      background: #fff4d6;
+      color: var(--warn);
+    }
+
+    .score.poor {
+      background: #fff0ec;
+      color: var(--bad);
+    }
+
+    .reasons {
+      margin: 10px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .hourly-chart-wrap {
+      position: relative;
+      height: 360px;
+    }
+
+    .window-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .window-card {
+      border: 1px solid var(--line);
+      border-left-width: 5px;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #fbfcfd;
+      font-size: 13px;
+    }
+
+    .window-card.good {
+      border-left-color: var(--good);
+    }
+
+    .window-card.caution {
+      border-left-color: var(--warn);
+    }
+
+    .window-card.poor {
+      border-left-color: var(--bad);
+    }
+
+    .window-card strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .window-card span {
+      color: var(--muted);
+    }
+
+    .domain-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .tab-button {
+      min-height: 36px;
+      border-color: var(--line);
+      background: #eef2f5;
+      color: var(--ink);
+    }
+
+    .tab-button.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: white;
+    }
+
+    .advisory-panel[hidden] {
+      display: none;
+    }
+
+    .map-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .map-head h2 {
+      margin-bottom: 0;
+    }
+
+    .map-frame {
+      width: 100%;
+      height: min(62vh, 560px);
+      min-height: 360px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #d8dee6;
+    }
+
+    .day dl,
+    .providers dl {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 5px 10px;
+      margin: 10px 0 0;
+      font-size: 13px;
+    }
+
+    dt {
+      color: var(--muted);
+    }
+
+    dd {
+      margin: 0;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .providers {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 10px;
+    }
+
+    .provider {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+      background: #fbfcfd;
+    }
+
+    .provider .error {
+      color: var(--bad);
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    details {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel);
+      overflow: hidden;
+    }
+
+    details + details {
+      margin-top: 10px;
+    }
+
+    summary {
+      cursor: pointer;
+      padding: 12px 14px;
+      font-weight: 800;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      max-height: 420px;
+      overflow: auto;
+      border-top: 1px solid var(--line);
+      background: #101923;
+      color: #d9e2ec;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+
+    .note {
+      color: var(--warn);
+      font-size: 13px;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 760px) {
+      main {
+        width: min(100% - 20px, 1180px);
+        padding-top: 18px;
+      }
+
+      header {
+        grid-template-columns: 1fr;
+      }
+
+      .toolbar {
+        justify-content: stretch;
+      }
+
+      label,
+      input,
+      select,
+      button {
+        width: 100%;
+      }
+
+      .today-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 460px) {
+      .today-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1 id="title">Hungary Weather Median</h1>
+        <p class="subtle" id="subtitle">Median forecast from Europe/Hungary-relevant public sources. Raw responses stay available below.</p>
+      </div>
+      <form class="toolbar" id="controls">
+        <label>
+          <span id="placeLabel">Place</span>
+          <select id="place">
+            <option value="47.58,18.88,Nagykovacsi">Nagykovacsi</option>
+            <option value="47.416667,16.85,Simasag">Simasag</option>
+            <option value="47.4979,19.0402,Budapest">Budapest</option>
+            <option value="46.2530,20.1414,Szeged">Szeged</option>
+            <option value="47.5316,21.6273,Debrecen">Debrecen</option>
+            <option value="46.0727,18.2323,Pecs">Pecs</option>
+            <option value="47.6875,17.6504,Gyor">Gyor</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label>
+          <span id="latLabel">Latitude</span>
+          <input id="lat" inputmode="decimal" value="47.58">
+        </label>
+        <label>
+          <span id="lonLabel">Longitude</span>
+          <input id="lon" inputmode="decimal" value="18.88">
+        </label>
+        <button id="locate" type="button">Use my location</button>
+        <label>
+          <span id="languageLabel">Language</span>
+          <select id="language">
+            <option value="en-GB">English</option>
+            <option value="hu-HU">Magyar</option>
+          </select>
+        </label>
+        <label>
+          <span id="cropLabel">Crop</span>
+          <select id="crop">
+            <option value="rapeseed">Rapeseed</option>
+            <option value="wheat">Wheat</option>
+            <option value="barley">Barley</option>
+            <option value="corn">Corn</option>
+            <option value="sunflower">Sunflower</option>
+          </select>
+        </label>
+        <label>
+          <span id="workLabel">Work</span>
+          <select id="work">
+            <option value="seeding">Seeding</option>
+            <option value="harvesting">Harvesting</option>
+          </select>
+        </label>
+        <button id="refresh" type="submit">Refresh</button>
+      </form>
+    </header>
+
+    <section class="panel">
+      <h2 id="todayTitle">Today</h2>
+      <div class="today-grid" id="today"></div>
+      <div class="status" id="status"></div>
+      <p class="note" id="medianNote">Median values ignore sources that fail or do not report a metric. Precipitation is the median daily sum, not a probability.</p>
+    </section>
+
+    <section class="panel">
+      <h2 id="forecastTitle">Forecast</h2>
+      <div class="forecast-grid" id="forecast"></div>
+    </section>
+
+    <section class="panel">
+      <div class="map-head">
+        <h2 id="mapTitle">Radar Map</h2>
+        <label>
+          <span id="mapLayerLabel">Layer</span>
+          <select id="mapLayer">
+            <option value="wind">Wind direction</option>
+            <option value="clouds">Cloud coverage</option>
+          </select>
+        </label>
+      </div>
+      <iframe class="map-frame" id="weatherMap" title="Windy weather map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
+      <p class="note" id="mapNote">Visual Windy layer only. It is not part of the median forecast calculation.</p>
+    </section>
+
+    <section class="panel">
+      <h2 id="advisoryTitle">Advisories</h2>
+      <div class="domain-tabs" role="tablist" aria-label="Advisory domains">
+        <button class="tab-button active" id="agriTab" type="button" role="tab" aria-controls="agriPanel" aria-selected="true">Agriculture</button>
+        <button class="tab-button" id="familyTab" type="button" role="tab" aria-controls="familyPanel" aria-selected="false">Family</button>
+      </div>
+
+      <div class="advisory-panel" id="agriPanel" role="tabpanel" aria-labelledby="agriTab">
+        <h3 id="hourlyTitle">Hourly Work Window</h3>
+        <div class="hourly-chart-wrap">
+          <canvas id="hourlyChart"></canvas>
+        </div>
+        <div class="window-grid" id="workWindows"></div>
+        <p class="note" id="hourlyNote">Hourly median for the next 48 hours. Shaded 6-hour windows use the selected crop and work rules.</p>
+        <div class="agri-grid" id="agri"></div>
+        <p class="note" id="agriNote">Heuristic field-work guidance only. It does not include soil moisture, crop stage, machinery limits or field access.</p>
+      </div>
+
+      <div class="advisory-panel" id="familyPanel" role="tabpanel" aria-labelledby="familyTab" hidden>
+        <div class="family-grid" id="family"></div>
+        <p class="note" id="familyNote">Practical weather-risk guidance only. It is not medical advice and does not account for personal health conditions.</p>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 id="providersTitle">Provider Snapshots</h2>
+      <div class="providers" id="providers"></div>
+    </section>
+
+    <section>
+      <h2 id="sourcesTitle">Sources</h2>
+      <div id="sources"></div>
+    </section>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script>
+    const zone = "Europe/Budapest";
+    const forecastDays = 5;
+    const openMeteoHourly = "temperature_2m,precipitation,wind_speed_10m,cloud_cover";
+    const LOCALE = Object.freeze({
+      EN_GB: "en-GB",
+      HU_HU: "hu-HU"
+    });
+    const CROP = Object.freeze({
+      RAPESEED: "rapeseed",
+      WHEAT: "wheat",
+      BARLEY: "barley",
+      CORN: "corn",
+      SUNFLOWER: "sunflower"
+    });
+    const WORK = Object.freeze({
+      SEEDING: "seeding",
+      HARVESTING: "harvesting"
+    });
+    const SCORE = Object.freeze({
+      GOOD: "good",
+      CAUTION: "caution",
+      POOR: "poor"
+    });
+    const MAP_LAYER = Object.freeze({
+      WIND: "wind",
+      CLOUDS: "clouds"
+    });
+    const SUPPORTED_LOCALES = Object.freeze([LOCALE.EN_GB, LOCALE.HU_HU]);
+    const SUPPORTED_CROPS = Object.freeze(Object.values(CROP));
+    const SUPPORTED_WORK = Object.freeze(Object.values(WORK));
+    const SUPPORTED_MAP_LAYERS = Object.freeze(Object.values(MAP_LAYER));
+    const COORD_LIMITS = Object.freeze({
+      LAT_MIN: -90,
+      LAT_MAX: 90,
+      LON_MIN: -180,
+      LON_MAX: 180
+    });
+    const AGRI_LIMITS = Object.freeze({
+      SEEDING_RAIN_POOR_MM: 8,
+      SEEDING_RAIN_CAUTION_MM: 2,
+      DRY_SEEDBED_RAIN_MM: 0.2,
+      DRY_SEEDBED_HIGH_C: 30,
+      COLD_SENSITIVE_LOW_C: 10,
+      RAPESEED_HEAT_C: 29,
+      RAPESEED_HEAT_RAIN_MM: 0.5,
+      HARVEST_RAIN_POOR_MM: 3,
+      HARVEST_RAIN_CAUTION_MM: 0.5,
+      DRYING_WEAK_CLOUD_PERCENT: 75,
+      WIND_POOR_KMH: 35,
+      WIND_CAUTION_KMH: 22,
+      HEAT_STRESS_C: 34,
+      SATURATED_WETNESS: 4,
+      PARTIAL_DRYING_WETNESS: 2
+    });
+    const PROVIDER_ID = Object.freeze({
+      ECMWF: "ecmwf",
+      DWD: "dwd",
+      METEOFRANCE: "meteofrance",
+      GFS: "gfs",
+      METNO: "metno"
+    });
+    const SETTINGS_KEY = "weatherman.settings.v1";
+    // Provider adapters map raw API payloads into this canonical hourly shape:
+    // { key, date, temp, precip, wind, cloud } with Budapest-local time and metric units.
+    const providers = [
+      {
+        id: PROVIDER_ID.ECMWF,
+        name: "ECMWF IFS",
+        url: coords => openMeteoUrl("/v1/ecmwf", coords)
+      },
+      {
+        id: PROVIDER_ID.DWD,
+        name: "DWD ICON",
+        url: coords => openMeteoUrl("/v1/dwd-icon", coords)
+      },
+      {
+        id: PROVIDER_ID.METEOFRANCE,
+        name: "Meteo-France",
+        url: coords => openMeteoUrl("/v1/meteofrance", coords)
+      },
+      {
+        id: PROVIDER_ID.GFS,
+        name: "NOAA GFS",
+        url: coords => openMeteoUrl("/v1/gfs", coords)
+      },
+      {
+        id: PROVIDER_ID.METNO,
+        name: "MET Norway",
+        url: coords => `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${coords.lat}&lon=${coords.lon}`,
+        mapResponse: normaliseMetNo
+      }
+    ];
+
+    const todayEl = document.querySelector("#today");
+    const forecastEl = document.querySelector("#forecast");
+    const hourlyChartCanvas = document.querySelector("#hourlyChart");
+    const workWindowsEl = document.querySelector("#workWindows");
+    const weatherMap = document.querySelector("#weatherMap");
+    const agriEl = document.querySelector("#agri");
+    const familyEl = document.querySelector("#family");
+    const providersEl = document.querySelector("#providers");
+    const sourcesEl = document.querySelector("#sources");
+    const statusEl = document.querySelector("#status");
+    const refreshButton = document.querySelector("#refresh");
+    const locateButton = document.querySelector("#locate");
+    const controls = document.querySelector("#controls");
+    const place = document.querySelector("#place");
+    const lat = document.querySelector("#lat");
+    const lon = document.querySelector("#lon");
+    const language = document.querySelector("#language");
+    const crop = document.querySelector("#crop");
+    const work = document.querySelector("#work");
+    const mapLayer = document.querySelector("#mapLayer");
+    const agriTab = document.querySelector("#agriTab");
+    const familyTab = document.querySelector("#familyTab");
+    const agriPanel = document.querySelector("#agriPanel");
+    const familyPanel = document.querySelector("#familyPanel");
+    let lastResults = [];
+    let lastAggregate = null;
+    let hourlyChart = null;
+
+    const text = {
+      [LOCALE.EN_GB]: {
+        title: "Hungary Weather Median",
+        subtitle: "Median forecast from Europe/Hungary-relevant public sources. Raw responses stay available below.",
+        place: "Place",
+        lat: "Latitude",
+        lon: "Longitude",
+        language: "Language",
+        crop: "Crop",
+        work: "Work",
+        refresh: "Refresh",
+        locate: "Use my location",
+        today: "Today",
+        forecast: "Forecast",
+        hourly: "Hourly Work Window",
+        hourlyNote: "Hourly median for the next 48 hours. Shaded 6-hour windows use the selected crop and work rules.",
+        map: "Radar Map",
+        mapLayer: "Layer",
+        mapNote: "Visual Windy layer only. It is not part of the median forecast calculation.",
+        windDirection: "Wind direction",
+        cloudCoverage: "Cloud coverage",
+        advisories: "Advisories",
+        agriculture: "Agricultural Work",
+        family: "Family",
+        providers: "Provider Snapshots",
+        sources: "Sources",
+        medianNote: "Median values ignore sources that fail or do not report a metric. Precipitation is the median daily sum, not a probability.",
+        agriNote: "Heuristic field-work guidance only. It does not include soil moisture, crop stage, machinery limits or field access.",
+        familyNote: "Practical weather-risk guidance only. It is not medical advice and does not account for personal health conditions.",
+        loading: count => `Loading ${count} sources...`,
+        invalidCoords: "Latitude must be between -90 and 90. Longitude must be between -180 and 180.",
+        locating: "Waiting for browser location permission...",
+        geolocationUnavailable: "Browser location is not available.",
+        geolocationFailed: "Could not read browser location.",
+        now: "Now",
+        activeSources: count => `${count} active sources`,
+        highLow: "High / low",
+        dailyRange: "Median daily range",
+        precipitation: "Precipitation",
+        dailyTotal: "Median daily total",
+        wind: "Wind",
+        dailyMax: "Median daily max",
+        chartUnavailable: "Chart library unavailable.",
+        tempChart: "Temperature",
+        rainChart: "Rain",
+        windChart: "Wind",
+        workWindow: "Work window",
+        rain: "Rain",
+        cloud: "Cloud",
+        sourceCount: "Sources",
+        high: "High",
+        low: "Low",
+        rawData: "raw data",
+        seeding: "Seeding",
+        harvesting: "Harvesting",
+        rapeseed: "Rapeseed",
+        wheat: "Wheat",
+        barley: "Barley",
+        corn: "Corn",
+        sunflower: "Sunflower",
+        dress: "Dress",
+        health: "Health risks",
+        good: "Good",
+        caution: "Caution",
+        poor: "Poor",
+        noData: "No usable forecast data",
+        reasons: {
+          rainPoor: "rain makes field work and soil contact unreliable",
+          rainCaution: "some rain may interrupt work",
+          drySeedbed: "dry forecast may limit seedbed moisture",
+          wetHarvest: "rain and wet crop risk are too high for harvest",
+          dryingWeak: "cloud cover suggests weak drying",
+          windPoor: "wind is too strong for accurate field operations",
+          windCaution: "wind may affect machinery accuracy and losses",
+          coldSensitive: "cold nights may slow emergence",
+          heatStress: "high heat increases crop and operator stress",
+          rapeseedHeat: "rapeseed seeding is sensitive to dry heat",
+          cerealHarvest: "small-grain harvest needs a dry window",
+          saturatedLand: "heavy earlier rain may leave the land too wet for field work",
+          partialDrying: "recent rain may still need more drying time",
+          workable: "weather window looks workable on the available forecast",
+          noData: "no usable forecast data"
+        },
+        familyReasons: {
+          lightClothes: "light breathable clothes",
+          warmLayer: "warm layer for cooler parts of the day",
+          coat: "coat, hat and gloves for cold exposure",
+          rainGear: "rain jacket or umbrella",
+          windLayer: "wind-resistant outer layer",
+          sunProtection: "hat, sunglasses and sunscreen for long outdoor time",
+          comfortable: "ordinary outdoor plans look comfortable",
+          heatHydration: "heat can affect anyone; plan water and shade",
+          heatReduceActivity: "reduce strenuous midday outdoor activity",
+          checkVulnerable: "check children, older adults and people with chronic conditions",
+          coldExposure: "cold exposure risk; keep children warm and dry",
+          wetCold: "rain with cool air can increase chill risk",
+          strongWind: "strong wind can make walking, cycling and playground time harder",
+          heavyRain: "heavy rain may disrupt school runs and outdoor plans",
+          noData: "no usable forecast data"
+        }
+      },
+      [LOCALE.HU_HU]: {
+        title: "Magyarországi időjárási medián",
+        subtitle: "Medián előrejelzés Európához és Magyarországhoz releváns nyilvános forrásokból. A nyers válaszok lent elérhetők.",
+        place: "Hely",
+        lat: "Szélesség",
+        lon: "Hosszúság",
+        language: "Nyelv",
+        crop: "Kultúra",
+        work: "Munka",
+        refresh: "Frissítés",
+        locate: "Saját helyzet",
+        today: "Ma",
+        forecast: "Előrejelzés",
+        hourly: "Óránkénti munkablak",
+        hourlyNote: "Óránkénti medián a következő 48 órára. Az árnyékolt 6 órás ablakok a kiválasztott kultúra és munka szabályait használják.",
+        map: "Radartérkép",
+        mapLayer: "Réteg",
+        mapNote: "Csak vizuális Windy réteg. Nem része a medián előrejelzés számításának.",
+        windDirection: "Szélirány",
+        cloudCoverage: "Felhőzet",
+        advisories: "Tanácsok",
+        agriculture: "Mezőgazdasági munka",
+        family: "Család",
+        providers: "Források röviden",
+        sources: "Nyers források",
+        medianNote: "A medián értékek kihagyják a hibás vagy hiányos forrásokat. A csapadék napi medián összeg, nem valószínűség.",
+        agriNote: "Csak heurisztikus munkaszervezési jelzés. Nem tartalmaz talajnedvességet, fenológiai állapotot, gépkorlátot vagy területi megközelítést.",
+        familyNote: "Csak gyakorlati időjárási kockázati jelzés. Nem orvosi tanács, és nem veszi figyelembe az egyéni egészségi állapotot.",
+        loading: count => `${count} forrás betöltése...`,
+        invalidCoords: "A szélességnek -90 és 90, a hosszúságnak -180 és 180 között kell lennie.",
+        locating: "Várakozás a böngésző helymeghatározási engedélyére...",
+        geolocationUnavailable: "A böngésző helymeghatározása nem elérhető.",
+        geolocationFailed: "Nem sikerült beolvasni a böngésző helyzetét.",
+        now: "Most",
+        activeSources: count => `${count} aktív forrás`,
+        highLow: "Max / min",
+        dailyRange: "Medián napi tartomány",
+        precipitation: "Csapadék",
+        dailyTotal: "Medián napi összeg",
+        wind: "Szél",
+        dailyMax: "Medián napi maximum",
+        chartUnavailable: "A diagramkönyvtár nem elérhető.",
+        tempChart: "Hőmérséklet",
+        rainChart: "Eső",
+        windChart: "Szél",
+        workWindow: "Munkablak",
+        rain: "Eső",
+        cloud: "Felhő",
+        sourceCount: "Forrás",
+        high: "Max",
+        low: "Min",
+        rawData: "nyers adat",
+        seeding: "Vetés",
+        harvesting: "Aratás",
+        rapeseed: "Repce",
+        wheat: "Búza",
+        barley: "Árpa",
+        corn: "Kukorica",
+        sunflower: "Napraforgó",
+        dress: "Öltözet",
+        health: "Egészségi kockázatok",
+        good: "Jó",
+        caution: "Óvatosan",
+        poor: "Nem ajánlott",
+        noData: "Nincs használható előrejelzés",
+        reasons: {
+          rainPoor: "az eső bizonytalanná teszi a munkát és a mag-talaj kapcsolatot",
+          rainCaution: "kisebb eső megszakíthatja a munkát",
+          drySeedbed: "a száraz előrejelzés korlátozhatja a kelést",
+          wetHarvest: "az eső és a nedves termény kockázata túl magas aratáshoz",
+          dryingWeak: "a felhőzet gyenge száradást jelez",
+          windPoor: "a szél túl erős a pontos munkavégzéshez",
+          windCaution: "a szél ronthatja a gépek pontosságát és növelheti a veszteséget",
+          coldSensitive: "a hideg éjszakák lassíthatják a kelést",
+          heatStress: "a nagy meleg növeli a növényi és kezelői stresszt",
+          rapeseedHeat: "a repce vetése érzékeny a száraz melegre",
+          cerealHarvest: "a gabonaaratásnak száraz ablak kell",
+          saturatedLand: "a korábbi nagy eső miatt a terület még túl nedves lehet a munkához",
+          partialDrying: "a friss csapadék után még száradási időre lehet szükség",
+          workable: "az elérhető előrejelzés alapján a munkablak használhatónak tűnik",
+          noData: "nincs használható előrejelzés"
+        },
+        familyReasons: {
+          lightClothes: "könnyű, jól szellőző ruházat",
+          warmLayer: "melegebb réteg a hűvösebb napszakokra",
+          coat: "kabát, sapka és kesztyű hideg kitettséghez",
+          rainGear: "esőkabát vagy esernyő",
+          windLayer: "szélálló külső réteg",
+          sunProtection: "sapka, napszemüveg és naptej hosszabb kinti időhöz",
+          comfortable: "a szokásos kinti programok kényelmesnek tűnnek",
+          heatHydration: "a hőség bárkit érinthet; tervezzetek vízzel és árnyékkal",
+          heatReduceActivity: "érdemes csökkenteni a megterhelő déli kinti aktivitást",
+          checkVulnerable: "figyeljetek a gyerekekre, idősekre és krónikus betegekre",
+          coldExposure: "hideg kitettségi kockázat; a gyerekek maradjanak melegen és szárazon",
+          wetCold: "az eső és hűvös levegő növelheti az áthűlés kockázatát",
+          strongWind: "az erős szél nehezítheti a sétát, biciklizést és játszóterezést",
+          heavyRain: "a nagy eső zavarhatja az iskolába járást és a kinti programokat",
+          noData: "nincs használható előrejelzés"
+        }
+      }
+    };
+
+    place.addEventListener("change", () => {
+      if (place.value === "custom") return;
+      const [nextLat, nextLon] = place.value.split(",");
+      lat.value = nextLat;
+      lon.value = nextLon;
+      saveSettings();
+    });
+
+    controls.addEventListener("submit", event => {
+      event.preventDefault();
+      saveSettings();
+      loadWeather();
+    });
+
+    locateButton.addEventListener("click", useBrowserLocation);
+    agriTab.addEventListener("click", () => setActiveDomain("agri"));
+    familyTab.addEventListener("click", () => setActiveDomain("family"));
+
+    [language, crop, work, mapLayer].forEach(control => {
+      control.addEventListener("change", () => {
+        applyStaticText();
+        updateMap();
+        saveSettings();
+        rerenderCachedWeather();
+      });
+    });
+
+    if (!loadSettings()) applyBrowserLocale();
+    applyStaticText();
+    loadWeather();
+
+    function t() {
+      const locale = SUPPORTED_LOCALES.includes(language.value) ? language.value : LOCALE.EN_GB;
+      return text[locale];
+    }
+
+    function loadSettings() {
+      try {
+        const settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null");
+        if (!settings) return false;
+        if (selectHasValue(place, settings.place)) place.value = settings.place;
+        if (Number.isFinite(settings.lat)) lat.value = String(settings.lat);
+        if (Number.isFinite(settings.lon)) lon.value = String(settings.lon);
+        if (selectHasValue(language, settings.language)) language.value = settings.language;
+        if (selectHasValue(crop, settings.crop)) crop.value = settings.crop;
+        if (selectHasValue(work, settings.work)) work.value = settings.work;
+        if (selectHasValue(mapLayer, settings.mapLayer)) mapLayer.value = settings.mapLayer;
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    function saveSettings() {
+      try {
+        const coords = parseCoords();
+        if (!coords) return;
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+          place: place.value,
+          lat: coords.lat,
+          lon: coords.lon,
+          language: language.value,
+          crop: crop.value,
+          work: work.value,
+          mapLayer: mapLayer.value
+        }));
+      } catch {
+        // localStorage may be disabled; the page remains usable without persistence.
+      }
+    }
+
+    function selectHasValue(select, value) {
+      return [...select.options].some(option => option.value === value);
+    }
+
+    function applyStaticText() {
+      const strings = t();
+      const locale = SUPPORTED_LOCALES.includes(language.value) ? language.value : LOCALE.EN_GB;
+      document.documentElement.lang = locale;
+      document.title = strings.title;
+      document.querySelector("#title").textContent = strings.title;
+      document.querySelector("#subtitle").textContent = strings.subtitle;
+      document.querySelector("#placeLabel").textContent = strings.place;
+      document.querySelector("#latLabel").textContent = strings.lat;
+      document.querySelector("#lonLabel").textContent = strings.lon;
+      document.querySelector("#languageLabel").textContent = strings.language;
+      document.querySelector("#cropLabel").textContent = strings.crop;
+      document.querySelector("#workLabel").textContent = strings.work;
+      refreshButton.textContent = strings.refresh;
+      locateButton.textContent = strings.locate;
+      document.querySelector("#todayTitle").textContent = strings.today;
+      document.querySelector("#forecastTitle").textContent = strings.forecast;
+      document.querySelector("#hourlyTitle").textContent = strings.hourly;
+      document.querySelector("#hourlyNote").textContent = strings.hourlyNote;
+      document.querySelector("#mapTitle").textContent = strings.map;
+      document.querySelector("#mapLayerLabel").textContent = strings.mapLayer;
+      document.querySelector("#mapNote").textContent = strings.mapNote;
+      document.querySelector("#advisoryTitle").textContent = strings.advisories;
+      agriTab.textContent = strings.agriculture;
+      familyTab.textContent = strings.family;
+      document.querySelector("#providersTitle").textContent = strings.providers;
+      document.querySelector("#sourcesTitle").textContent = strings.sources;
+      document.querySelector("#medianNote").textContent = strings.medianNote;
+      document.querySelector("#agriNote").textContent = strings.agriNote;
+      document.querySelector("#familyNote").textContent = strings.familyNote;
+      updateOptionLabels(crop, SUPPORTED_CROPS);
+      updateOptionLabels(work, SUPPORTED_WORK);
+      updateMapLayerLabels();
+    }
+
+    function updateOptionLabels(select, values) {
+      values.forEach(value => {
+        select.querySelector(`option[value="${value}"]`).textContent = t()[value];
+      });
+    }
+
+    function renderAll(results, aggregate) {
+      const usable = results.filter(result => result.ok);
+      renderStatus(results);
+      renderToday(aggregate.today, usable.length);
+      renderForecast(aggregate.days);
+      renderHourlyWork(usable);
+      renderAgriculture(aggregate.days);
+      renderFamily(aggregate.days);
+      renderProviders(results);
+      renderSources(results);
+    }
+
+    function rerenderCachedWeather() {
+      if (lastAggregate) renderAll(lastResults, lastAggregate);
+    }
+
+    function setActiveDomain(domain) {
+      const familyActive = domain === "family";
+      agriTab.classList.toggle("active", !familyActive);
+      familyTab.classList.toggle("active", familyActive);
+      agriTab.setAttribute("aria-selected", String(!familyActive));
+      familyTab.setAttribute("aria-selected", String(familyActive));
+      agriPanel.hidden = familyActive;
+      familyPanel.hidden = !familyActive;
+      if (!familyActive && hourlyChart) hourlyChart.resize();
+    }
+
+    function updateMapLayerLabels() {
+      mapLayer.querySelector(`option[value="${MAP_LAYER.WIND}"]`).textContent = t().windDirection;
+      mapLayer.querySelector(`option[value="${MAP_LAYER.CLOUDS}"]`).textContent = t().cloudCoverage;
+    }
+
+    function updateMap() {
+      const coords = readCoords();
+      if (!coords) return;
+      const layer = SUPPORTED_MAP_LAYERS.includes(mapLayer.value) ? mapLayer.value : MAP_LAYER.WIND;
+      const params = new URLSearchParams({
+        lat: coords.lat.toFixed(4),
+        lon: coords.lon.toFixed(4),
+        detailLat: coords.lat.toFixed(4),
+        detailLon: coords.lon.toFixed(4),
+        width: "650",
+        height: "450",
+        zoom: "8",
+        level: "surface",
+        overlay: layer,
+        product: "ecmwf",
+        menu: "",
+        message: "true",
+        marker: "true",
+        calendar: "now",
+        pressure: "",
+        type: "map",
+        location: "coordinates",
+        detail: "",
+        metricWind: "km/h",
+        metricTemp: "°C",
+        radarRange: "-1"
+      });
+      weatherMap.src = `https://embed.windy.com/embed2.html?${params}`;
+    }
+
+    function applyBrowserLocale() {
+      const browserLocale = (navigator.languages || [navigator.language])
+        .filter(Boolean)
+        .map(locale => locale.toLowerCase())
+        .find(locale => locale.startsWith("hu"));
+      language.value = browserLocale ? LOCALE.HU_HU : LOCALE.EN_GB;
+    }
+
+    function useBrowserLocation() {
+      if (!navigator.geolocation) {
+        statusEl.innerHTML = `<span class="pill bad">${escapeHtml(t().geolocationUnavailable)}</span>`;
+        return;
+      }
+
+      locateButton.disabled = true;
+      statusEl.innerHTML = `<span class="pill">${escapeHtml(t().locating)}</span>`;
+      navigator.geolocation.getCurrentPosition(
+        position => {
+          place.value = "custom";
+          lat.value = position.coords.latitude.toFixed(5);
+          lon.value = position.coords.longitude.toFixed(5);
+          locateButton.disabled = false;
+          saveSettings();
+          loadWeather();
+        },
+        () => {
+          locateButton.disabled = false;
+          statusEl.innerHTML = `<span class="pill bad">${escapeHtml(t().geolocationFailed)}</span>`;
+        },
+        {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 600000
+        }
+      );
+    }
+
+    function openMeteoUrl(path, coords) {
+      const params = new URLSearchParams({
+        latitude: coords.lat,
+        longitude: coords.lon,
+        hourly: openMeteoHourly,
+        forecast_days: String(forecastDays),
+        timezone: zone,
+        wind_speed_unit: "kmh",
+        precipitation_unit: "mm",
+        temperature_unit: "celsius",
+        cell_selection: "land"
+      });
+      return `https://api.open-meteo.com${path}?${params}`;
+    }
+
+    async function loadWeather() {
+      const coords = readCoords();
+      if (!coords) return;
+
+      refreshButton.disabled = true;
+      todayEl.innerHTML = loadingMetricMarkup();
+      forecastEl.innerHTML = "";
+      agriEl.innerHTML = "";
+      providersEl.innerHTML = "";
+      sourcesEl.innerHTML = "";
+      statusEl.innerHTML = `<span class="pill">${escapeHtml(t().loading(providers.length))}</span>`;
+
+      const results = await Promise.all(providers.map(provider => fetchProvider(provider, coords)));
+      const usable = results.filter(result => result.ok);
+      const aggregate = buildAggregate(usable);
+      lastResults = results;
+      lastAggregate = aggregate;
+      updateMap();
+
+      renderAll(results, aggregate);
+
+      refreshButton.disabled = false;
+    }
+
+    function readCoords() {
+      const coords = parseCoords();
+      if (!coords) {
+        statusEl.innerHTML = `<span class="pill bad">${escapeHtml(t().invalidCoords)}</span>`;
+        return null;
+      }
+      return coords;
+    }
+
+    function parseCoords() {
+      const coords = {
+        lat: Number(lat.value.trim().replace(",", ".")),
+        lon: Number(lon.value.trim().replace(",", "."))
+      };
+      if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lon)) return null;
+      if (coords.lat < COORD_LIMITS.LAT_MIN || coords.lat > COORD_LIMITS.LAT_MAX) return null;
+      if (coords.lon < COORD_LIMITS.LON_MIN || coords.lon > COORD_LIMITS.LON_MAX) return null;
+      return coords;
+    }
+
+    async function fetchProvider(provider, coords) {
+      const url = provider.url(coords);
+      try {
+        const response = await fetch(url, {
+          headers: { "Accept": "application/json" }
+        });
+        const raw = await parseProviderPayload(response);
+        if (!response.ok) {
+          throw new Error(providerErrorMessage(response, raw));
+        }
+        const mapResponse = provider.mapResponse || normaliseOpenMeteo;
+        return {
+          ok: true,
+          provider,
+          url,
+          raw,
+          hourly: mapResponse(raw),
+          fetchedAt: new Date().toISOString()
+        };
+      } catch (error) {
+        return {
+          ok: false,
+          provider,
+          url,
+          error: error.message,
+          fetchedAt: new Date().toISOString()
+        };
+      }
+    }
+
+    async function parseProviderPayload(response) {
+      const body = await response.text();
+      if (!body) {
+        if (!response.ok) return null;
+        throw new Error("Provider returned an empty response.");
+      }
+      try {
+        return JSON.parse(body);
+      } catch {
+        if (!response.ok) return { error: body.slice(0, 180) };
+        throw new Error("Provider returned invalid JSON.");
+      }
+    }
+
+    function providerErrorMessage(response, raw) {
+      const message = raw?.reason || raw?.error || response.statusText;
+      return message ? `${response.status} ${message}` : `${response.status}`;
+    }
+
+    function normaliseOpenMeteo(raw) {
+      const hourly = raw.hourly || {};
+      return (hourly.time || []).map((time, index) => ({
+        key: `${time.slice(0, 13)}:00`,
+        date: time.slice(0, 10),
+        temp: valueAt(hourly.temperature_2m, index),
+        precip: valueAt(hourly.precipitation, index),
+        wind: valueAt(hourly.wind_speed_10m, index),
+        cloud: valueAt(hourly.cloud_cover, index)
+      }));
+    }
+
+    function normaliseMetNo(raw) {
+      return (raw.properties?.timeseries || []).map(entry => {
+        const details = entry.data?.instant?.details || {};
+        const nextHour = entry.data?.next_1_hours?.details || {};
+        const key = budapestHourKey(new Date(entry.time));
+        return {
+          key,
+          date: key.slice(0, 10),
+          temp: numberOrNull(details.air_temperature),
+          precip: numberOrNull(nextHour.precipitation_amount),
+          wind: numberOrNull(details.wind_speed) === null ? null : details.wind_speed * 3.6,
+          cloud: numberOrNull(details.cloud_area_fraction)
+        };
+      });
+    }
+
+    function buildAggregate(results) {
+      const today = budapestDateKey(new Date());
+      const byProviderDay = results.flatMap(result => dailyForProvider(result, today));
+      const dayKeys = [...new Set(byProviderDay.map(day => day.date))].sort().slice(0, forecastDays);
+      const days = dayKeys.map(date => aggregateDay(date, byProviderDay.filter(day => day.date === date)));
+      return {
+        today: days.find(day => day.date === today) || aggregateDay(today, []),
+        days
+      };
+    }
+
+    function dailyForProvider(result) {
+      const groups = new Map();
+      result.hourly.forEach(hour => {
+        if (!groups.has(hour.date)) groups.set(hour.date, []);
+        groups.get(hour.date).push(hour);
+      });
+      return [...groups].map(([date, hours]) => ({
+        provider: result.provider.name,
+        date,
+        currentTemp: nearestCurrentTemp(hours),
+        high: max(hours.map(hour => hour.temp)),
+        low: min(hours.map(hour => hour.temp)),
+        precip: sum(hours.map(hour => hour.precip)),
+        wind: max(hours.map(hour => hour.wind)),
+        cloud: median(hours.map(hour => hour.cloud))
+      }));
+    }
+
+    function aggregateDay(date, providerDays) {
+      return {
+        date,
+        sources: providerDays.length,
+        currentTemp: median(providerDays.map(day => day.currentTemp)),
+        high: median(providerDays.map(day => day.high)),
+        low: median(providerDays.map(day => day.low)),
+        precip: median(providerDays.map(day => day.precip)),
+        wind: median(providerDays.map(day => day.wind)),
+        cloud: median(providerDays.map(day => day.cloud))
+      };
+    }
+
+    function hourlyAggregate(results, limit = 48) {
+      const currentKey = budapestHourKey(new Date());
+      const byHour = new Map();
+      results.forEach(result => {
+        result.hourly.forEach(hour => {
+          if (hour.key < currentKey) return;
+          if (!byHour.has(hour.key)) byHour.set(hour.key, []);
+          byHour.get(hour.key).push(hour);
+        });
+      });
+      return [...byHour]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .slice(0, limit)
+        .map(([key, hours]) => ({
+          key,
+          date: key.slice(0, 10),
+          sources: hours.length,
+          temp: median(hours.map(hour => hour.temp)),
+          precip: median(hours.map(hour => hour.precip)),
+          wind: median(hours.map(hour => hour.wind)),
+          cloud: median(hours.map(hour => hour.cloud))
+        }));
+    }
+
+    function workWindows(hours, size = 6) {
+      const windows = [];
+      for (let start = 0; start < hours.length; start += size) {
+        const slice = hours.slice(start, start + size);
+        if (slice.length < size) break;
+        const summary = {
+          date: slice[0].date,
+          sources: max(slice.map(hour => hour.sources)),
+          currentTemp: slice[0].temp,
+          high: max(slice.map(hour => hour.temp)),
+          low: min(slice.map(hour => hour.temp)),
+          precip: sum(slice.map(hour => hour.precip)),
+          wind: max(slice.map(hour => hour.wind)),
+          cloud: median(slice.map(hour => hour.cloud))
+        };
+        windows.push({
+          start,
+          end: start + slice.length - 1,
+          startKey: slice[0].key,
+          endKey: slice[slice.length - 1].key,
+          summary,
+          evaluation: evaluateAgriculture(summary, crop.value, work.value, windows.map(window => window.summary))
+        });
+      }
+      return windows;
+    }
+
+    function nearestCurrentTemp(hours) {
+      const currentKey = budapestHourKey(new Date());
+      const exact = hours.find(hour => hour.key === currentKey);
+      if (exact) return exact.temp;
+      return hours.find(hour => hour.key > currentKey)?.temp ?? null;
+    }
+
+    function renderStatus(results) {
+      statusEl.innerHTML = results.map(result => {
+        const cls = result.ok ? "ok" : "bad";
+        const text = result.ok ? `${result.provider.name}: ${result.hourly.length} hours` : `${result.provider.name}: ${result.error}`;
+        return `<span class="pill ${cls}">${escapeHtml(text)}</span>`;
+      }).join("");
+    }
+
+    function renderToday(day, sourceCount) {
+      const strings = t();
+      todayEl.innerHTML = [
+        metricMarkup(strings.now, formatTemp(day.currentTemp), strings.activeSources(sourceCount)),
+        metricMarkup(strings.highLow, `${formatTemp(day.high)} / ${formatTemp(day.low)}`, strings.dailyRange),
+        metricMarkup(strings.precipitation, formatMm(day.precip), strings.dailyTotal),
+        metricMarkup(strings.wind, formatKmh(day.wind), strings.dailyMax)
+      ].join("");
+    }
+
+    function renderForecast(days) {
+      const strings = t();
+      forecastEl.innerHTML = days.map(day => `
+        <article class="day">
+          <time datetime="${day.date}">${formatDate(day.date)}</time>
+          <strong>${formatTemp(day.high)} / ${formatTemp(day.low)}</strong>
+          <dl>
+            <dt>${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
+            <dt>${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
+            <dt>${strings.cloud}</dt><dd>${formatPercent(day.cloud)}</dd>
+            <dt>${strings.sourceCount}</dt><dd>${day.sources}</dd>
+          </dl>
+        </article>
+      `).join("");
+    }
+
+    function renderHourlyWork(results) {
+      const strings = t();
+      const hours = hourlyAggregate(results);
+      const windows = workWindows(hours);
+      renderWorkWindowCards(windows);
+
+      if (typeof Chart === "undefined") {
+        workWindowsEl.innerHTML += noteMarkup(strings.chartUnavailable);
+        return;
+      }
+
+      if (hourlyChart) hourlyChart.destroy();
+      hourlyChart = new Chart(hourlyChartCanvas, {
+        type: "bar",
+        data: {
+          labels: hours.map(hour => formatHour(hour.key)),
+          datasets: [
+            {
+              type: "line",
+              label: strings.tempChart,
+              data: hours.map(hour => hour.temp),
+              yAxisID: "temp",
+              borderColor: "#b42318",
+              backgroundColor: "#b42318",
+              pointRadius: 0,
+              tension: 0.25
+            },
+            {
+              label: strings.rainChart,
+              data: hours.map(hour => hour.precip),
+              yAxisID: "rain",
+              backgroundColor: "rgba(15, 118, 110, 0.32)",
+              borderColor: "#0f766e",
+              borderWidth: 1
+            },
+            {
+              type: "line",
+              label: strings.windChart,
+              data: hours.map(hour => hour.wind),
+              yAxisID: "wind",
+              borderColor: "#334e68",
+              backgroundColor: "#334e68",
+              pointRadius: 0,
+              tension: 0.2
+            }
+          ]
+        },
+        options: hourlyChartOptions(strings, windows),
+        plugins: [workWindowBands]
+      });
+    }
+
+    function renderWorkWindowCards(windows) {
+      const strings = t();
+      workWindowsEl.innerHTML = windows.map(window => `
+        <article class="window-card ${window.evaluation.level}">
+          <strong>${formatWindowRange(window.startKey, window.endKey)}</strong>
+          <span>${strings[window.evaluation.level]} · ${formatMm(window.summary.precip)} · ${formatKmh(window.summary.wind)}</span>
+        </article>
+      `).join("");
+    }
+
+    function hourlyChartOptions(strings, windows) {
+      return {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: "index",
+          intersect: false
+        },
+        plugins: {
+          legend: {
+            position: "top"
+          },
+          tooltip: {
+            callbacks: {
+              afterBody(items) {
+                const window = windows.find(candidate => items[0].dataIndex >= candidate.start && items[0].dataIndex <= candidate.end);
+                return window ? `${strings.workWindow}: ${strings[window.evaluation.level]}` : "";
+              }
+            }
+          },
+          workWindowBands: {
+            windows
+          }
+        },
+        scales: {
+          x: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              maxRotation: 0,
+              autoSkipPadding: 18
+            }
+          },
+          temp: {
+            type: "linear",
+            position: "left",
+            title: {
+              display: true,
+              text: "°C"
+            }
+          },
+          rain: {
+            type: "linear",
+            position: "right",
+            beginAtZero: true,
+            title: {
+              display: true,
+              text: "mm"
+            },
+            grid: {
+              drawOnChartArea: false
+            }
+          },
+          wind: {
+            type: "linear",
+            position: "right",
+            beginAtZero: true,
+            display: false,
+            grid: {
+              drawOnChartArea: false
+            }
+          }
+        }
+      };
+    }
+
+    const workWindowBands = {
+      id: "workWindowBands",
+      beforeDatasetsDraw(chart, args, options) {
+        const windows = options.windows || [];
+        const { ctx, chartArea, scales } = chart;
+        if (!chartArea || !scales.x) return;
+        ctx.save();
+        windows.forEach(window => {
+          const start = windowBoundary(scales.x, window.start, -0.5);
+          const end = windowBoundary(scales.x, window.end, 0.5);
+          ctx.fillStyle = windowBandColor(window.evaluation.level);
+          ctx.fillRect(start, chartArea.top, end - start, chartArea.bottom - chartArea.top);
+        });
+        ctx.restore();
+      }
+    };
+
+    function windowBoundary(scale, index, offset) {
+      const here = scale.getPixelForValue(index);
+      const other = scale.getPixelForValue(index + (offset < 0 ? 1 : -1));
+      const width = Math.abs(here - other) || 12;
+      return here + width * offset;
+    }
+
+    function windowBandColor(level) {
+      if (level === SCORE.GOOD) return "rgba(19, 115, 51, 0.08)";
+      if (level === SCORE.CAUTION) return "rgba(161, 92, 0, 0.10)";
+      return "rgba(180, 35, 24, 0.08)";
+    }
+
+    function renderAgriculture(days) {
+      const strings = t();
+      agriEl.innerHTML = days.map((day, index) => {
+        const evaluation = evaluateAgriculture(day, crop.value, work.value, days.slice(0, index));
+        return `
+          <article class="agri-card">
+            <time datetime="${day.date}">${formatDate(day.date)}</time>
+            <h3>${strings[crop.value]} - ${strings[work.value]}</h3>
+            <span class="score ${evaluation.level}">${strings[evaluation.level]}</span>
+            <ul class="reasons">
+              ${evaluation.reasons.map(reason => `<li>${escapeHtml(strings.reasons[reason])}</li>`).join("")}
+            </ul>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderFamily(days) {
+      const strings = t();
+      familyEl.innerHTML = days.map(day => {
+        const advice = evaluateFamily(day);
+        return `
+          <article class="family-card">
+            <time datetime="${day.date}">${formatDate(day.date)}</time>
+            <h3>${strings.dress}</h3>
+            <span class="score ${advice.level}">${strings[advice.level]}</span>
+            <ul class="reasons">
+              ${advice.dress.map(reason => `<li>${escapeHtml(strings.familyReasons[reason])}</li>`).join("")}
+            </ul>
+            <h3>${strings.health}</h3>
+            <ul class="reasons">
+              ${advice.health.map(reason => `<li>${escapeHtml(strings.familyReasons[reason])}</li>`).join("")}
+            </ul>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function evaluateFamily(day) {
+      if (!day.sources) {
+        return { level: SCORE.POOR, dress: ["noData"], health: ["noData"] };
+      }
+
+      const dress = [];
+      const health = [];
+      let score = 0;
+      const high = day.high ?? 0;
+      const low = day.low ?? 99;
+      const rain = day.precip ?? 0;
+      const wind = day.wind ?? 0;
+      const cloud = day.cloud ?? 100;
+
+      if (high >= 28) addDress("lightClothes");
+      else if (low <= 0) addDress("coat");
+      else if (low <= 12) addDress("warmLayer");
+      else addDress("comfortable");
+
+      if (rain >= 1) addDress("rainGear");
+      if (wind >= 22) addDress("windLayer");
+      if (high >= 24 && cloud <= 45) addDress("sunProtection");
+
+      if (high >= 34) addHealth("heatReduceActivity", 3);
+      else if (high >= 30) addHealth("heatHydration", 2);
+      if (high >= 30) addHealth("checkVulnerable", 1);
+      if (low <= 0) addHealth("coldExposure", 2);
+      if (low <= 8 && rain >= 1) addHealth("wetCold", 1);
+      if (wind >= 35) addHealth("strongWind", 2);
+      if (rain >= 8) addHealth("heavyRain", 2);
+
+      if (!health.length) addHealth("comfortable", 0);
+
+      return {
+        level: score >= 4 ? SCORE.POOR : score >= 2 ? SCORE.CAUTION : SCORE.GOOD,
+        dress,
+        health
+      };
+
+      function addDress(reason) {
+        if (!dress.includes(reason)) dress.push(reason);
+      }
+
+      function addHealth(reason, points) {
+        if (!health.includes(reason)) health.push(reason);
+        score += points;
+      }
+    }
+
+    function evaluateAgriculture(day, cropKey, workKey, previousDays = []) {
+      if (!day.sources) {
+        return { level: SCORE.POOR, reasons: ["noData"] };
+      }
+
+      const reasons = [];
+      let score = 0;
+      const rain = day.precip ?? 0;
+      const wind = day.wind ?? 0;
+      const high = day.high ?? 0;
+      const low = day.low ?? 99;
+      const cloud = day.cloud ?? 0;
+      const wetness = carryOverWetness(previousDays, day);
+
+      if (workKey === WORK.SEEDING) {
+        if (rain >= AGRI_LIMITS.SEEDING_RAIN_POOR_MM) addReason("rainPoor", 3);
+        else if (rain >= AGRI_LIMITS.SEEDING_RAIN_CAUTION_MM) addReason("rainCaution", 1);
+        else if (rain <= AGRI_LIMITS.DRY_SEEDBED_RAIN_MM && high >= AGRI_LIMITS.DRY_SEEDBED_HIGH_C) addReason("drySeedbed", 1);
+
+        if ([CROP.CORN, CROP.SUNFLOWER].includes(cropKey) && low < AGRI_LIMITS.COLD_SENSITIVE_LOW_C) addReason("coldSensitive", 2);
+        if (cropKey === CROP.RAPESEED && high >= AGRI_LIMITS.RAPESEED_HEAT_C && rain <= AGRI_LIMITS.RAPESEED_HEAT_RAIN_MM) addReason("rapeseedHeat", 2);
+      } else {
+        if (rain >= AGRI_LIMITS.HARVEST_RAIN_POOR_MM) addReason("wetHarvest", 3);
+        else if (rain >= AGRI_LIMITS.HARVEST_RAIN_CAUTION_MM) addReason("rainCaution", 2);
+        if (cloud >= AGRI_LIMITS.DRYING_WEAK_CLOUD_PERCENT) addReason("dryingWeak", 1);
+        if ([CROP.RAPESEED, CROP.WHEAT, CROP.BARLEY].includes(cropKey) && rain >= AGRI_LIMITS.HARVEST_RAIN_CAUTION_MM) addReason("cerealHarvest", 1);
+      }
+
+      if (wind >= AGRI_LIMITS.WIND_POOR_KMH) addReason("windPoor", 3);
+      else if (wind >= AGRI_LIMITS.WIND_CAUTION_KMH) addReason("windCaution", 1);
+      if (high >= AGRI_LIMITS.HEAT_STRESS_C) addReason("heatStress", 1);
+      if (wetness >= AGRI_LIMITS.SATURATED_WETNESS) addReason("saturatedLand", 3);
+      else if (wetness >= AGRI_LIMITS.PARTIAL_DRYING_WETNESS) addReason("partialDrying", 1);
+
+      if (!reasons.length) {
+        return { level: SCORE.GOOD, reasons: ["workable"] };
+      }
+      return {
+        level: score >= 4 ? SCORE.POOR : SCORE.CAUTION,
+        reasons
+      };
+
+      function addReason(reason, points) {
+        if (!reasons.includes(reason)) reasons.push(reason);
+        score += points;
+      }
+    }
+
+    function carryOverWetness(previousDays, day) {
+      const recent = previousDays.slice(-2);
+      const wetness = recent.reduce((total, previousDay, index) => {
+        const ageWeight = index === recent.length - 1 ? 1 : 0.45;
+        const rain = previousDay.precip ?? 0;
+        if (rain >= 15) return total + 5 * ageWeight;
+        if (rain >= 8) return total + 3 * ageWeight;
+        if (rain >= 3) return total + 1.5 * ageWeight;
+        return total;
+      }, 0);
+      return Math.max(0, wetness - dryingCredit(day));
+    }
+
+    function dryingCredit(day) {
+      let credit = 0;
+      if ((day.precip ?? 0) <= 0.5) credit += 1;
+      if ((day.high ?? 0) >= 22) credit += 1;
+      if ((day.wind ?? 0) >= 10 && (day.wind ?? 0) <= 28) credit += 0.75;
+      if ((day.cloud ?? 100) <= 45) credit += 0.75;
+      return credit;
+    }
+
+    function renderProviders(results) {
+      const strings = t();
+      providersEl.innerHTML = results.map(result => {
+        if (!result.ok) {
+          return `
+            <article class="provider">
+              <h3>${escapeHtml(result.provider.name)}</h3>
+              <p class="error">${escapeHtml(result.error)}</p>
+            </article>
+          `;
+        }
+        const today = dailyForProvider(result).find(day => day.date === budapestDateKey(new Date()));
+        return `
+          <article class="provider">
+            <h3>${escapeHtml(result.provider.name)}</h3>
+            <dl>
+              <dt>${strings.now}</dt><dd>${formatTemp(today?.currentTemp)}</dd>
+              <dt>${strings.high}</dt><dd>${formatTemp(today?.high)}</dd>
+              <dt>${strings.low}</dt><dd>${formatTemp(today?.low)}</dd>
+              <dt>${strings.rain}</dt><dd>${formatMm(today?.precip)}</dd>
+              <dt>${strings.wind}</dt><dd>${formatKmh(today?.wind)}</dd>
+            </dl>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function renderSources(results) {
+      sourcesEl.innerHTML = results.map(result => {
+        const payload = result.ok ? result.raw : { error: result.error };
+        return `
+          <details>
+            <summary>${escapeHtml(result.provider.name)} ${escapeHtml(t().rawData)}</summary>
+            <pre>${escapeHtml(JSON.stringify({
+              url: result.url,
+              fetchedAt: result.fetchedAt,
+              payload
+            }, null, 2))}</pre>
+          </details>
+        `;
+      }).join("");
+    }
+
+    function loadingMetricMarkup() {
+      const strings = t();
+      return [
+        metricMarkup(strings.now, "...", strings.loading(providers.length)),
+        metricMarkup(strings.highLow, "...", strings.loading(providers.length)),
+        metricMarkup(strings.precipitation, "...", strings.loading(providers.length)),
+        metricMarkup(strings.wind, "...", strings.loading(providers.length))
+      ].join("");
+    }
+
+    function metricMarkup(label, value, help) {
+      return `
+        <article class="metric">
+          <span>${label}</span>
+          <strong>${value}</strong>
+          <small>${help}</small>
+        </article>
+      `;
+    }
+
+    function median(values) {
+      const clean = values.filter(value => Number.isFinite(value)).sort((a, b) => a - b);
+      if (!clean.length) return null;
+      const middle = Math.floor(clean.length / 2);
+      return clean.length % 2 ? clean[middle] : (clean[middle - 1] + clean[middle]) / 2;
+    }
+
+    function max(values) {
+      const clean = values.filter(value => Number.isFinite(value));
+      return clean.length ? Math.max(...clean) : null;
+    }
+
+    function min(values) {
+      const clean = values.filter(value => Number.isFinite(value));
+      return clean.length ? Math.min(...clean) : null;
+    }
+
+    function sum(values) {
+      const clean = values.filter(value => Number.isFinite(value));
+      return clean.length ? clean.reduce((total, value) => total + value, 0) : null;
+    }
+
+    function valueAt(values, index) {
+      return numberOrNull(Array.isArray(values) ? values[index] : null);
+    }
+
+    function numberOrNull(value) {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    function budapestDateKey(date) {
+      return partsFor(date).slice(0, 3).join("-");
+    }
+
+    function budapestHourKey(date) {
+      const [year, month, day, hour] = partsFor(date);
+      return `${year}-${month}-${day}T${hour}:00`;
+    }
+
+    function partsFor(date) {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: zone,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        hourCycle: "h23",
+        hour12: false
+      }).formatToParts(date);
+      const pick = type => parts.find(part => part.type === type).value;
+      return [pick("year"), pick("month"), pick("day"), pick("hour")];
+    }
+
+    function formatDate(date) {
+      const parsed = new Date(`${date}T12:00:00`);
+      return new Intl.DateTimeFormat(language.value === LOCALE.HU_HU ? LOCALE.HU_HU : LOCALE.EN_GB, {
+        weekday: "short",
+        day: "2-digit",
+        month: "short"
+      }).format(parsed);
+    }
+
+    function formatHour(key) {
+      return new Intl.DateTimeFormat(language.value === LOCALE.HU_HU ? LOCALE.HU_HU : LOCALE.EN_GB, {
+        weekday: "short",
+        hour: "2-digit"
+      }).format(new Date(key));
+    }
+
+    function formatWindowRange(startKey, endKey) {
+      const locale = language.value === LOCALE.HU_HU ? LOCALE.HU_HU : LOCALE.EN_GB;
+      const format = new Intl.DateTimeFormat(locale, {
+        weekday: "short",
+        hour: "2-digit"
+      });
+      return `${format.format(new Date(startKey))} - ${format.format(new Date(endKey))}`;
+    }
+
+    function formatTemp(value) {
+      return Number.isFinite(value) ? `${Math.round(value)}°C` : "n/a";
+    }
+
+    function formatMm(value) {
+      return Number.isFinite(value) ? `${value.toFixed(1)} mm` : "n/a";
+    }
+
+    function formatKmh(value) {
+      return Number.isFinite(value) ? `${Math.round(value)} km/h` : "n/a";
+    }
+
+    function formatPercent(value) {
+      return Number.isFinite(value) ? `${Math.round(value)}%` : "n/a";
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function noteMarkup(message) {
+      return `<p class="note">${escapeHtml(message)}</p>`;
+    }
+  </script>
+</body>
+</html>
