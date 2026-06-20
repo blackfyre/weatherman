@@ -643,6 +643,8 @@
       METNO: "metno"
     });
     const SETTINGS_KEY = "weatherman.settings.v1";
+    const PROVIDER_CACHE_TTL_MS = 15 * 60 * 1000;
+    const providerCache = new Map();
     // Provider adapters map raw API payloads into this canonical hourly shape:
     // { key, date, temp, precip, wind, windDirection, cloud } with Budapest-local time and metric units.
     const providers = [
@@ -1190,6 +1192,13 @@
 
     async function fetchProvider(provider, coords) {
       const url = provider.url(coords);
+      const cacheKey = `${provider.id}:${url}`;
+      const cached = providerCache.get(cacheKey);
+      if (cached && Date.now() - cached.cachedAt < PROVIDER_CACHE_TTL_MS) {
+        return cached.result;
+      }
+      providerCache.delete(cacheKey);
+
       try {
         const response = await fetch(url, {
           headers: { "Accept": "application/json" }
@@ -1199,7 +1208,7 @@
           throw new Error(providerErrorMessage(response, raw));
         }
         const mapResponse = provider.mapResponse || normaliseOpenMeteo;
-        return {
+        const result = {
           ok: true,
           provider,
           url,
@@ -1207,6 +1216,11 @@
           hourly: mapResponse(raw),
           fetchedAt: new Date().toISOString()
         };
+        providerCache.set(cacheKey, {
+          cachedAt: Date.now(),
+          result
+        });
+        return result;
       } catch (error) {
         return {
           ok: false,
