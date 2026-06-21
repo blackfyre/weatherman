@@ -71,6 +71,7 @@ const PROVIDER_ID = Object.freeze({
 const SETTINGS_KEY = "weatherman.settings.v1";
 const FORECAST_HISTORY_PREFIX = "weatherman.forecastHistory.v1";
 const PROVIDER_CACHE_TTL_MS = 15 * 60 * 1000;
+const PROVIDER_TIMEOUT_MS = 10000;
 const MAX_FORECAST_SNAPSHOTS = 6;
 const providerCache = new Map();
 // Provider adapters map raw API payloads into this canonical hourly shape:
@@ -174,6 +175,7 @@ const text = {
     agriNote: "Heuristic field-work guidance only. It does not include soil moisture, crop stage, machinery limits or field access.",
     familyNote: "Practical weather-risk guidance only. It is not medical advice and does not account for personal health conditions.",
     loading: count => `Loading ${count} sources...`,
+    providerTimeout: seconds => `Provider timed out after ${seconds} seconds.`,
     invalidCoords: "Latitude must be between -90 and 90. Longitude must be between -180 and 180.",
     locating: "Waiting for browser location permission...",
     geolocationUnavailable: "Browser location is not available.",
@@ -195,7 +197,10 @@ const text = {
     rainChart: "Rain",
     windChart: "Wind",
     workWindow: "Work window",
+    agriculturalWorkWindow: "Best agricultural work window",
     confidence: "Confidence",
+    fetched: "Fetched",
+    cached: "cached",
     rain: "Rain",
     cloud: "Cloud",
     sourceCount: "Sources",
@@ -204,6 +209,7 @@ const text = {
     bestWindow: "Best work window",
     noGoodWindow: "No good 6-hour work window in the next 48 hours.",
     agriInputs: "Inputs behind the score",
+    wettestSource: "Wettest source",
     wetness: "Carry-over wetness",
     familySituations: "Daily situations",
     schoolRun: "School run",
@@ -238,7 +244,7 @@ const text = {
     health: "Health risks",
     tomorrowFamily: "Tomorrow for the kids",
     tomorrowSummary: (level, dress, health) => `${level}. ${dress}. ${health}.`,
-    remindAtSeven: "Notify at 19:00",
+    remindAtSeven: "Notify at 19:00 while open",
     reminderUnavailable: "Notifications are not available in this browser.",
     reminderEnabled: "Reminder set for 19:00 while this app is open.",
     reminderDenied: "Notification permission was not granted.",
@@ -319,6 +325,7 @@ const text = {
     agriNote: "Csak heurisztikus munkaszervezési jelzés. Nem tartalmaz talajnedvességet, fenológiai állapotot, gépkorlátot vagy területi megközelítést.",
     familyNote: "Csak gyakorlati időjárási kockázati jelzés. Nem orvosi tanács, és nem veszi figyelembe az egyéni egészségi állapotot.",
     loading: count => `${count} forrás betöltése...`,
+    providerTimeout: seconds => `A forrás ${seconds} másodperc után időtúllépésre futott.`,
     invalidCoords: "A szélességnek -90 és 90, a hosszúságnak -180 és 180 között kell lennie.",
     locating: "Várakozás a böngésző helymeghatározási engedélyére...",
     geolocationUnavailable: "A böngésző helymeghatározása nem elérhető.",
@@ -340,7 +347,10 @@ const text = {
     rainChart: "Eső",
     windChart: "Szél",
     workWindow: "Munkablak",
+    agriculturalWorkWindow: "Legjobb mezőgazdasági munkablak",
     confidence: "Bizalom",
+    fetched: "Lekérve",
+    cached: "gyorsítótárból",
     rain: "Eső",
     cloud: "Felhő",
     sourceCount: "Forrás",
@@ -349,6 +359,7 @@ const text = {
     bestWindow: "Legjobb munkablak",
     noGoodWindow: "Nincs jó 6 órás munkablak a következő 48 órában.",
     agriInputs: "A pontszám bemenetei",
+    wettestSource: "Legcsapadékosabb forrás",
     wetness: "Áthúzódó nedvesség",
     familySituations: "Napi helyzetek",
     schoolRun: "Iskolába menet",
@@ -383,7 +394,7 @@ const text = {
     health: "Egészségi kockázatok",
     tomorrowFamily: "Holnap a gyerekeknek",
     tomorrowSummary: (level, dress, health) => `${level}. ${dress}. ${health}.`,
-    remindAtSeven: "Értesítés 19:00-kor",
+    remindAtSeven: "Értesítés 19:00-kor, amíg nyitva van",
     reminderUnavailable: "A böngésző nem támogatja az értesítéseket.",
     reminderEnabled: "Emlékeztető beállítva 19:00-ra, amíg az app nyitva van.",
     reminderDenied: "Az értesítési engedély nincs megadva.",
@@ -804,13 +815,16 @@ async function fetchProvider(provider, coords) {
   const cacheKey = `${provider.id}:${url}`;
   const cached = providerCache.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < PROVIDER_CACHE_TTL_MS) {
-    return cached.result;
+    return { ...cached.result, fromCache: true, cacheAgeMs: Date.now() - cached.cachedAt };
   }
   providerCache.delete(cacheKey);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), PROVIDER_TIMEOUT_MS);
 
   try {
     const response = await fetch(url, {
-      headers: { "Accept": "application/json" }
+      headers: { "Accept": "application/json" },
+      signal: controller.signal
     });
     const raw = await parseProviderPayload(response);
     if (!response.ok) {
@@ -824,7 +838,9 @@ async function fetchProvider(provider, coords) {
       raw,
       hourly: mapResponse(raw),
       dailyUv: normaliseDailyUv(raw),
-      fetchedAt: new Date().toISOString()
+      fetchedAt: new Date().toISOString(),
+      fromCache: false,
+      cacheAgeMs: 0
     };
     providerCache.set(cacheKey, {
       cachedAt: Date.now(),
@@ -836,9 +852,11 @@ async function fetchProvider(provider, coords) {
       ok: false,
       provider,
       url,
-      error: error.message,
+      error: error.name === "AbortError" ? t().providerTimeout(PROVIDER_TIMEOUT_MS / 1000) : error.message,
       fetchedAt: new Date().toISOString()
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -977,10 +995,28 @@ function withForecastConfidence(days, history) {
   return days.map((day, index) => {
     const previous = previousDays.find(candidate => candidate.date === day.date);
     const base = index < 2 ? 96 - index * 3 : Math.max(58, 92 - index * 10);
-    const penalty = previous ? forecastChangePenalty(day, previous) : 0;
+    const penalty = sourceCountPenalty(day) + providerSpreadPenalty(day) + (previous ? forecastChangePenalty(day, previous) : 0);
     const score = Math.max(35, Math.round(base - penalty));
     return { ...day, confidence: score, previous };
   });
+}
+
+function sourceCountPenalty(day) {
+  if (!day.sources) return 40;
+  if (day.sources === 1) return 22;
+  if (day.sources === 2) return 12;
+  return 0;
+}
+
+function providerSpreadPenalty(day) {
+  const spread = day.spread || {};
+  return Math.min(24, [
+    normalisedRange(spread.high, 6),
+    normalisedRange(spread.low, 6),
+    normalisedRange(spread.precip, 10),
+    normalisedRange(spread.wind, 30),
+    normalisedRange(spread.uv, 5)
+  ].reduce((total, value) => total + value, 0) * 8);
 }
 
 function forecastChangePenalty(day, previous) {
@@ -997,6 +1033,11 @@ function forecastChangePenalty(day, previous) {
 function normalisedDelta(current, previous, range) {
   if (!Number.isFinite(current) || !Number.isFinite(previous)) return 0;
   return Math.min(1, Math.abs(current - previous) / range);
+}
+
+function normalisedRange(spread, range) {
+  if (!Number.isFinite(spread?.range)) return 0;
+  return Math.min(1, spread.range / range);
 }
 
 function hourlyAggregate(results, limit = 48) {
@@ -1024,9 +1065,9 @@ function hourlyAggregate(results, limit = 48) {
     }));
 }
 
-function workWindows(hours, size = 6) {
+function workWindows(hours, size = 6, step = size) {
   const windows = [];
-  for (let start = 0; start < hours.length; start += size) {
+  for (let start = 0; start < hours.length; start += step) {
     const slice = hours.slice(start, start + size);
     if (slice.length < size) break;
     const summary = {
@@ -1062,7 +1103,7 @@ function nearestCurrentTemp(hours) {
 function renderStatus(results) {
   statusEl.innerHTML = results.map(result => {
     const cls = result.ok ? "ok" : "bad";
-    const text = result.ok ? `${result.provider.name}: ${result.hourly.length} hours` : `${result.provider.name}: ${result.error}`;
+    const text = result.ok ? `${result.provider.name}: ${result.hourly.length} hours, ${formatFreshness(result)}` : `${result.provider.name}: ${result.error}`;
     const icon = result.ok ? "fa-circle-check" : "fa-triangle-exclamation";
     return `<span class="pill ${cls}">${iconMarkup(icon)} ${escapeHtml(text)}</span>`;
   }).join("");
@@ -1082,13 +1123,13 @@ function renderToday(day, sourceCount) {
 function renderForecastInsight(days, results) {
   const strings = t();
   const target = days.find(day => day.date === tomorrowDateKey()) || days[1] || days[0];
-  const windows = workWindows(hourlyAggregate(results));
+  const windows = workWindows(hourlyAggregate(results), 6, 1);
   const bestWindow = windows.find(window => window.evaluation.level === SCORE.GOOD)
     || windows.find(window => window.evaluation.level === SCORE.CAUTION);
   const items = [
     [strings.providerAgreement, describeProviderAgreement(target)],
     [strings.changeSinceLast, describeForecastChange(target)],
-    [strings.bestWindow, describeBestWindow(bestWindow)]
+    [strings.agriculturalWorkWindow, describeBestWindow(bestWindow)]
   ];
   const uvNote = describeUvNuance(target);
   if (uvNote) items.push([strings.uv, uvNote]);
@@ -1505,12 +1546,17 @@ function evaluateFamily(day) {
 
 function agriInputSummary(day, previousDays) {
   const wetness = carryOverWetness(previousDays, day);
-  return [
+  const inputs = [
     `${t().rain}: ${formatMm(day.precip)}`,
     `${t().highLow}: ${formatTemp(day.high)} / ${formatTemp(day.low)}`,
     `${t().cloud}: ${formatPercent(day.cloud)}`,
     `${t().wetness}: ${wetness.toFixed(1)}`
-  ].join(", ");
+  ];
+  const wettest = day.spread?.precip?.max;
+  if (Number.isFinite(wettest) && wettest > (day.precip ?? 0)) {
+    inputs.push(`${t().wettestSource}: ${formatMm(wettest)}`);
+  }
+  return inputs.join(", ");
 }
 
 function evaluateAgriculture(day, cropKey, workKey, previousDays = []) {
@@ -1520,7 +1566,7 @@ function evaluateAgriculture(day, cropKey, workKey, previousDays = []) {
 
   const reasons = [];
   let score = 0;
-  const rain = day.precip ?? 0;
+  const rain = advisoryRain(day);
   const wind = day.wind ?? 0;
   const high = day.high ?? 0;
   const low = day.low ?? 99;
@@ -1570,6 +1616,12 @@ function evaluateAgriculture(day, cropKey, workKey, previousDays = []) {
   }
 }
 
+function advisoryRain(day) {
+  const wettest = day.spread?.precip?.max;
+  if (Number.isFinite(wettest)) return Math.max(day.precip ?? 0, wettest);
+  return day.precip ?? 0;
+}
+
 function carryOverWetness(previousDays, day) {
   const recent = previousDays.slice(-2);
   const wetness = recent.reduce((total, previousDay, index) => {
@@ -1609,6 +1661,7 @@ function renderProviders(results) {
       <article class="provider">
         <h3>${iconMarkup("fa-satellite-dish")} ${escapeHtml(result.provider.name)}</h3>
         <dl>
+          <dt>${strings.fetched}</dt><dd>${formatFreshness(result)}</dd>
           <dt>${strings.now}</dt><dd>${formatTemp(today?.currentTemp)}</dd>
           <dt>${strings.high}</dt><dd>${formatTemp(today?.high)}</dd>
           <dt>${strings.low}</dt><dd>${formatTemp(today?.low)}</dd>
@@ -1862,6 +1915,17 @@ function formatUv(value) {
 
 function formatConfidence(value) {
   return Number.isFinite(value) ? `${Math.round(value)}%` : "n/a";
+}
+
+function formatFreshness(result) {
+  const fetched = new Date(result.fetchedAt);
+  if (Number.isNaN(fetched.getTime())) return "n/a";
+  const locale = language.value === LOCALE.HU_HU ? LOCALE.HU_HU : LOCALE.EN_GB;
+  const time = new Intl.DateTimeFormat(locale, {
+    hour: "2-digit",
+    minute: "2-digit"
+  }).format(fetched);
+  return result.fromCache ? `${time}, ${t().cached}` : time;
 }
 
 function forecastConfidenceColor(value) {

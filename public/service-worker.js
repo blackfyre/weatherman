@@ -1,4 +1,4 @@
-const CACHE_NAME = "weatherman-v6";
+const CACHE_NAME = "weatherman-v7";
 const APP_SHELL = [
   "/",
   "/index.html",
