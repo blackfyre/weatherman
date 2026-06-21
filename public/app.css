@@ -173,6 +173,10 @@ section {
   text-align: right;
 }
 
+.source-status-row.alert .source-status-meta {
+  color: inherit;
+}
+
 .update-toast {
   position: sticky;
   top: 12px;
@@ -456,6 +460,10 @@ dd {
   margin-top: 8px;
 }
 
+.provider .error.alert {
+  color: inherit;
+}
+
 .table-wrap {
   overflow-x: auto;
   margin-top: 10px;
@@ -513,6 +521,10 @@ pre {
   color: var(--warn);
   font-size: 13px;
   margin-top: 10px;
+}
+
+.note.alert {
+  color: inherit;
 }
 
 @media (max-width: 760px) {
