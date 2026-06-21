@@ -513,8 +513,10 @@ function registerServiceWorker() {
     window.location.reload();
   });
 
-  navigator.serviceWorker.register("service-worker.js")
+  navigator.serviceWorker.register("service-worker.js", { updateViaCache: "none" })
     .then(registration => {
+      registration.update().catch(() => {});
+
       updateReload.addEventListener("click", () => {
         const worker = registration.waiting;
         if (!worker) return;
