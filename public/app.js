@@ -1158,18 +1158,7 @@ function nearestCurrentTemp(hours) {
 }
 
 function renderStatus(results) {
-  statusEl.innerHTML = results.map(result => {
-    const alertClass = result.ok ? "alert-success" : "alert-error";
-    const statusClass = result.ok ? "status-success" : "status-error";
-    const meta = result.ok ? formatFreshness(result) : result.error;
-    return `
-      <div class="source-status-row alert ${alertClass}">
-        <span class="status status-sm ${statusClass}" aria-hidden="true"></span>
-        <span class="source-status-name">${escapeHtml(result.provider.name)}</span>
-        <span class="source-status-meta">${escapeHtml(meta)}</span>
-      </div>
-    `;
-  }).join("");
+  statusEl.innerHTML = "";
 }
 
 function statusMessageMarkup(message, level, icon) {
@@ -1791,9 +1780,15 @@ function renderSourceComparison(results) {
 function renderSources(results) {
   sourcesEl.innerHTML = results.map(result => {
     const payload = result.ok ? result.raw : { error: result.error };
+    const statusClass = result.ok ? "status-success" : "status-error";
+    const meta = result.ok ? formatFreshness(result) : result.error;
     return `
       <details class="collapse collapse-arrow bg-base-100 border border-base-300">
-        <summary class="collapse-title">${iconMarkup("fa-file-code")} ${escapeHtml(result.provider.name)} ${escapeHtml(t().rawData)}</summary>
+        <summary class="collapse-title source-summary">
+          <span class="status status-sm ${statusClass}" aria-hidden="true"></span>
+          <span class="source-summary-name">${iconMarkup("fa-file-code")} ${escapeHtml(result.provider.name)} ${escapeHtml(t().rawData)}</span>
+          <span class="source-summary-meta">${escapeHtml(meta)}</span>
+        </summary>
         <pre class="collapse-content">${escapeHtml(JSON.stringify({
           url: result.url,
           fetchedAt: result.fetchedAt,

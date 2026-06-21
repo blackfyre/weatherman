@@ -97,7 +97,7 @@ await new Promise(resolve => setTimeout(resolve, 0));
 
 assert.equal(document.title, "Hungary Weather Median");
 assert.equal(elements.title.textContent, "Hungary Weather Median");
-assert.match(elements.status.innerHTML, /active sources|ECMWF IFS/);
+assert.match(elements.sources.innerHTML, /ECMWF IFS/);
 assert.match(elements.today.innerHTML, /n\/a/);
 
 console.log("smoke test passed");
