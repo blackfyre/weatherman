@@ -412,6 +412,10 @@ section {
   margin-bottom: 14px;
 }
 
+.domain-tabs .fa-solid {
+  margin-right: 6px;
+}
+
 .advisory-panel[hidden] {
   display: none;
 }
