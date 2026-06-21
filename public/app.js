@@ -691,12 +691,12 @@ function applyBrowserLocale() {
 
 function useBrowserLocation() {
   if (!navigator.geolocation) {
-    statusEl.innerHTML = `<span class="status-chip bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationUnavailable)}</span>`;
+    statusEl.innerHTML = statusMessageMarkup(t().geolocationUnavailable, "error", "fa-triangle-exclamation");
     return;
   }
 
   locateButton.disabled = true;
-  statusEl.innerHTML = `<span class="status-chip">${iconMarkup("fa-location-crosshairs")} ${escapeHtml(t().locating)}</span>`;
+  statusEl.innerHTML = statusMessageMarkup(t().locating, "info", "fa-location-crosshairs");
   navigator.geolocation.getCurrentPosition(
     position => {
       place.value = "custom";
@@ -708,7 +708,7 @@ function useBrowserLocation() {
     },
     () => {
       locateButton.disabled = false;
-      statusEl.innerHTML = `<span class="status-chip bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationFailed)}</span>`;
+      statusEl.innerHTML = statusMessageMarkup(t().geolocationFailed, "error", "fa-triangle-exclamation");
     },
     {
       enableHighAccuracy: false,
@@ -748,7 +748,7 @@ async function loadWeather() {
   sourceComparisonEl.innerHTML = "";
   providersEl.innerHTML = "";
   sourcesEl.innerHTML = "";
-  statusEl.innerHTML = `<span class="status-chip">${iconMarkup("fa-cloud-arrow-down")} ${escapeHtml(t().loading(providers.length))}</span>`;
+  statusEl.innerHTML = statusMessageMarkup(t().loading(providers.length), "info", "fa-cloud-arrow-down");
 
   const results = await Promise.all(providers.map(provider => fetchProvider(provider, coords)));
   const usable = results.filter(result => result.ok);
@@ -769,7 +769,7 @@ async function loadWeather() {
 function readCoords() {
   const coords = parseCoords();
   if (!coords) {
-    statusEl.innerHTML = `<span class="status-chip bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().invalidCoords)}</span>`;
+    statusEl.innerHTML = statusMessageMarkup(t().invalidCoords, "error", "fa-triangle-exclamation");
     return null;
   }
   return coords;
@@ -1104,11 +1104,26 @@ function nearestCurrentTemp(hours) {
 
 function renderStatus(results) {
   statusEl.innerHTML = results.map(result => {
-    const cls = result.ok ? "ok" : "bad";
-    const text = result.ok ? `${result.provider.name}: ${result.hourly.length} hours, ${formatFreshness(result)}` : `${result.provider.name}: ${result.error}`;
+    const alertClass = result.ok ? "alert-success" : "alert-error";
     const statusClass = result.ok ? "status-success" : "status-error";
-    return `<span class="status-chip ${cls}"><span class="status status-sm ${statusClass}" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
+    const meta = result.ok ? formatFreshness(result) : result.error;
+    return `
+      <div class="source-status-row alert ${alertClass}">
+        <span class="status status-sm ${statusClass}" aria-hidden="true"></span>
+        <span class="source-status-name">${escapeHtml(result.provider.name)}</span>
+        <span class="source-status-meta">${escapeHtml(meta)}</span>
+      </div>
+    `;
   }).join("");
+}
+
+function statusMessageMarkup(message, level, icon) {
+  return `
+    <div class="source-status-row alert alert-${level}">
+      ${iconMarkup(icon)}
+      <span class="source-status-name">${escapeHtml(message)}</span>
+    </div>
+  `;
 }
 
 function renderToday(day, sourceCount) {
