@@ -124,6 +124,9 @@ const sourcesEl = document.querySelector("#sources");
 const statusEl = document.querySelector("#status");
 const refreshButton = document.querySelector("#refresh");
 const locateButton = document.querySelector("#locate");
+const updateToast = document.querySelector("#updateToast");
+const updateToastText = document.querySelector("#updateToastText");
+const updateReload = document.querySelector("#updateReload");
 const controls = document.querySelector("#controls");
 const place = document.querySelector("#place");
 const lat = document.querySelector("#lat");
@@ -152,6 +155,8 @@ const text = {
     work: "Work",
     refresh: "Refresh",
     locate: "Use my location",
+    updateAvailable: "New version available.",
+    updateReload: "Reload",
     today: "Today",
     forecast: "Forecast",
     hourly: "Hourly Work Window",
@@ -295,6 +300,8 @@ const text = {
     work: "Munka",
     refresh: "Frissítés",
     locate: "Saját helyzet",
+    updateAvailable: "Új verzió érhető el.",
+    updateReload: "Újratöltés",
     today: "Ma",
     forecast: "Előrejelzés",
     hourly: "Óránkénti munkablak",
@@ -466,7 +473,41 @@ loadWeather();
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("service-worker.js").catch(() => {});
+  let reloadingForUpdate = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloadingForUpdate) return;
+    reloadingForUpdate = true;
+    window.location.reload();
+  });
+
+  navigator.serviceWorker.register("service-worker.js")
+    .then(registration => {
+      updateReload.addEventListener("click", () => {
+        const worker = registration.waiting;
+        if (!worker) return;
+        updateReload.disabled = true;
+        worker.postMessage({ type: "SKIP_WAITING" });
+      });
+
+      if (registration.waiting && navigator.serviceWorker.controller) {
+        showUpdateToast();
+      }
+
+      registration.addEventListener("updatefound", () => {
+        const worker = registration.installing;
+        if (!worker) return;
+        worker.addEventListener("statechange", () => {
+          if (worker.state === "installed" && navigator.serviceWorker.controller) {
+            showUpdateToast();
+          }
+        });
+      });
+    })
+    .catch(() => {});
+}
+
+function showUpdateToast() {
+  updateToast.hidden = false;
 }
 
 function t() {
@@ -528,6 +569,8 @@ function applyStaticText() {
   document.querySelector("#workLabel").textContent = strings.work;
   refreshButton.innerHTML = `${iconMarkup("fa-rotate-right")} ${escapeHtml(strings.refresh)}`;
   locateButton.innerHTML = `${iconMarkup("fa-location-crosshairs")} ${escapeHtml(strings.locate)}`;
+  updateToastText.textContent = strings.updateAvailable;
+  updateReload.innerHTML = `${iconMarkup("fa-rotate")} ${escapeHtml(strings.updateReload)}`;
   document.querySelector("#todayTitle").innerHTML = `${iconMarkup("fa-sun")} ${escapeHtml(strings.today)}`;
   document.querySelector("#forecastTitle").innerHTML = `${iconMarkup("fa-cloud-sun")} ${escapeHtml(strings.forecast)}`;
   document.querySelector("#hourlyTitle").textContent = strings.hourly;

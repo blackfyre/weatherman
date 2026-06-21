@@ -1,4 +1,4 @@
-const CACHE_NAME = "weatherman-v5";
+const CACHE_NAME = "weatherman-v6";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -19,6 +19,12 @@ self.addEventListener("activate", event => {
       keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
     ))
   );
+});
+
+self.addEventListener("message", event => {
+  if (event.data?.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener("fetch", event => {
