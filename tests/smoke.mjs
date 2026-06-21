@@ -29,8 +29,8 @@ class Element {
   }
 }
 
-const html = fs.readFileSync("index.html", "utf8");
-const script = fs.readFileSync("app.js", "utf8");
+const html = fs.readFileSync("src/index.html", "utf8");
+const script = fs.readFileSync("src/app.js", "utf8");
 
 const ids = [...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]);
 const elements = Object.fromEntries(ids.map(id => [id, new Element(id)]));

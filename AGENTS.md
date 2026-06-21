@@ -4,8 +4,8 @@
 
 This repository is a static single-page weather application.
 
-- `index.html` is the source of truth for the app. It contains the HTML, CSS, and JavaScript.
-- `public/index.html` is the Cloudflare Pages publish artefact. Regenerate it from `index.html` before deployment.
+- `src/` contains the source files for the static app.
+- `public/` contains the Cloudflare Pages publish artefacts. Regenerate it from `src/` before deployment.
 - `Documentation/` contains project notes and ADR topic candidates.
 - `mise.toml` defines local tasks and deployment commands.
 - `start-codex-tmux.sh` starts a tmux workspace for development.
