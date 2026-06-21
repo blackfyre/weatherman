@@ -1,6 +1,7 @@
 const zone = "Europe/Budapest";
 const forecastDays = 5;
 const openMeteoHourly = "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover";
+const openMeteoDaily = "uv_index_max,uv_index_clear_sky_max";
 const LOCALE = Object.freeze({
   EN_GB: "en-GB",
   HU_HU: "hu-HU"
@@ -60,6 +61,7 @@ const AGRI_LIMITS = Object.freeze({
   PARTIAL_DRYING_WETNESS: 2
 });
 const PROVIDER_ID = Object.freeze({
+  OPENMETEO: "openmeteo",
   ECMWF: "ecmwf",
   DWD: "dwd",
   METEOFRANCE: "meteofrance",
@@ -74,6 +76,11 @@ const providerCache = new Map();
 // Provider adapters map raw API payloads into this canonical hourly shape:
 // { key, date, temp, precip, wind, windDirection, cloud } with Budapest-local time and metric units.
 const providers = [
+  {
+    id: PROVIDER_ID.OPENMETEO,
+    name: "Open-Meteo Forecast",
+    url: coords => openMeteoUrl("/v1/forecast", coords)
+  },
   {
     id: PROVIDER_ID.ECMWF,
     name: "ECMWF IFS",
@@ -97,7 +104,7 @@ const providers = [
   {
     id: PROVIDER_ID.METNO,
     name: "MET Norway",
-    url: coords => `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${coords.lat}&lon=${coords.lon}`,
+    url: coords => `https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=${coords.lat}&lon=${coords.lon}`,
     mapResponse: normaliseMetNo
   }
 ];
@@ -168,6 +175,9 @@ const text = {
     dailyRange: "Median daily range",
     precipitation: "Precipitation",
     dailyTotal: "Median daily total",
+    uv: "UV index",
+    dailyUvMax: "Median daily max",
+    uvClearSky: "clear sky",
     wind: "Wind",
     dailyMax: "Median daily max",
     rulingWindDirection: "Ruling direction",
@@ -278,6 +288,9 @@ const text = {
     dailyRange: "Medián napi tartomány",
     precipitation: "Csapadék",
     dailyTotal: "Medián napi összeg",
+    uv: "UV-index",
+    dailyUvMax: "Medián napi maximum",
+    uvClearSky: "derült égbolt",
     wind: "Szél",
     dailyMax: "Medián napi maximum",
     rulingWindDirection: "Uralkodó irány",
@@ -591,6 +604,7 @@ function openMeteoUrl(path, coords) {
     latitude: coords.lat,
     longitude: coords.lon,
     hourly: openMeteoHourly,
+    daily: openMeteoDaily,
     forecast_days: String(forecastDays),
     timezone: zone,
     wind_speed_unit: "kmh",
@@ -669,7 +683,7 @@ function saveForecastHistory(coords, days) {
     const snapshots = loadForecastHistory(coords);
     snapshots.unshift({
       fetchedAt: new Date().toISOString(),
-      days: days.map(({ date, high, low, precip, wind, cloud, sources }) => ({ date, high, low, precip, wind, cloud, sources }))
+      days: days.map(({ date, high, low, precip, wind, cloud, uv, uvClearSky, sources }) => ({ date, high, low, precip, wind, cloud, uv, uvClearSky, sources }))
     });
     localStorage.setItem(forecastHistoryKey(coords), JSON.stringify(snapshots.slice(0, MAX_FORECAST_SNAPSHOTS)));
   } catch {
@@ -701,6 +715,7 @@ async function fetchProvider(provider, coords) {
       url,
       raw,
       hourly: mapResponse(raw),
+      dailyUv: normaliseDailyUv(raw),
       fetchedAt: new Date().toISOString()
     };
     providerCache.set(cacheKey, {
@@ -747,7 +762,18 @@ function normaliseOpenMeteo(raw) {
     precip: valueAt(hourly.precipitation, index),
     wind: valueAt(hourly.wind_speed_10m, index),
     windDirection: valueAt(hourly.wind_direction_10m, index),
-    cloud: valueAt(hourly.cloud_cover, index)
+    cloud: valueAt(hourly.cloud_cover, index),
+    uv: valueAt(hourly.uv_index, index),
+    uvClearSky: valueAt(hourly.uv_index_clear_sky, index)
+  }));
+}
+
+function normaliseDailyUv(raw) {
+  const daily = raw.daily || {};
+  return (daily.time || []).map((date, index) => ({
+    date,
+    uv: valueAt(daily.uv_index_max, index),
+    uvClearSky: valueAt(daily.uv_index_clear_sky_max, index)
   }));
 }
 
@@ -763,7 +789,8 @@ function normaliseMetNo(raw) {
       precip: numberOrNull(nextHour.precipitation_amount),
       wind: numberOrNull(details.wind_speed) === null ? null : details.wind_speed * 3.6,
       windDirection: numberOrNull(details.wind_from_direction),
-      cloud: numberOrNull(details.cloud_area_fraction)
+      cloud: numberOrNull(details.cloud_area_fraction),
+      uvClearSky: numberOrNull(details.ultraviolet_index_clear_sky)
     };
   });
 }
@@ -781,6 +808,7 @@ function buildAggregate(results) {
 
 function dailyForProvider(result) {
   const groups = new Map();
+  const uvByDate = new Map((result.dailyUv || []).map(day => [day.date, day]));
   result.hourly.forEach(hour => {
     if (!groups.has(hour.date)) groups.set(hour.date, []);
     groups.get(hour.date).push(hour);
@@ -794,7 +822,9 @@ function dailyForProvider(result) {
     precip: sum(hours.map(hour => hour.precip)),
     wind: max(hours.map(hour => hour.wind)),
     windDirection: prevailingDirection(hours.map(hour => hour.windDirection)),
-    cloud: median(hours.map(hour => hour.cloud))
+    cloud: median(hours.map(hour => hour.cloud)),
+    uv: uvByDate.get(date)?.uv ?? max(hours.map(hour => hour.uv)),
+    uvClearSky: uvByDate.get(date)?.uvClearSky ?? max(hours.map(hour => hour.uvClearSky))
   }));
 }
 
@@ -808,7 +838,9 @@ function aggregateDay(date, providerDays) {
     precip: median(providerDays.map(day => day.precip)),
     wind: median(providerDays.map(day => day.wind)),
     windDirection: prevailingDirection(providerDays.map(day => day.windDirection)),
-    cloud: median(providerDays.map(day => day.cloud))
+    cloud: median(providerDays.map(day => day.cloud)),
+    uv: median(providerDays.map(day => day.uv)),
+    uvClearSky: median(providerDays.map(day => day.uvClearSky))
   };
 }
 
@@ -829,7 +861,8 @@ function forecastChangePenalty(day, previous) {
     normalisedDelta(day.low, previous.low, 6),
     normalisedDelta(day.precip, previous.precip, 10),
     normalisedDelta(day.wind, previous.wind, 30),
-    normalisedDelta(day.cloud, previous.cloud, 60)
+    normalisedDelta(day.cloud, previous.cloud, 60),
+    normalisedDelta(day.uv, previous.uv, 5)
   ].reduce((total, value) => total + value, 0) * 12);
 }
 
@@ -913,6 +946,7 @@ function renderToday(day, sourceCount) {
     metricMarkup("fa-temperature-half", strings.now, formatTemp(day.currentTemp), strings.activeSources(sourceCount)),
     metricMarkup("fa-arrows-up-down", strings.highLow, `${formatTemp(day.high)} / ${formatTemp(day.low)}`, strings.dailyRange),
     metricMarkup("fa-cloud-rain", strings.precipitation, formatMm(day.precip), strings.dailyTotal),
+    metricMarkup("fa-sun", strings.uv, formatUv(day.uv), `${strings.dailyUvMax} · ${strings.uvClearSky}: ${formatUv(day.uvClearSky)}`),
     metricMarkup("fa-wind", strings.wind, formatKmh(day.wind), `${strings.dailyMax} · ${formatWindDirection(day.windDirection)}`)
   ].join("");
 }
@@ -926,6 +960,7 @@ function renderForecast(days) {
       <dl>
         <dt>${iconMarkup("fa-gauge-high")} ${strings.confidence}</dt><dd>${formatConfidence(day.confidence)}</dd>
         <dt>${iconMarkup("fa-cloud-rain")} ${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
+        <dt>${iconMarkup("fa-sun")} ${strings.uv}</dt><dd>${formatUv(day.uv)}</dd>
         <dt>${iconMarkup("fa-wind")} ${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
         <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
         <dt>${strings.cloud}</dt><dd>${formatPercent(day.cloud)}</dd>
@@ -1216,6 +1251,7 @@ function evaluateFamily(day) {
   const rain = day.precip ?? 0;
   const wind = day.wind ?? 0;
   const cloud = day.cloud ?? 100;
+  const uv = day.uv ?? day.uvClearSky ?? 0;
 
   if (high >= 28) addDress("lightClothes");
   else if (low <= 0) addDress("coat");
@@ -1224,7 +1260,7 @@ function evaluateFamily(day) {
 
   if (rain >= 1) addDress("rainGear");
   if (wind >= 22) addDress("windLayer");
-  if (high >= 24 && cloud <= 45) addDress("sunProtection");
+  if (uv >= 3 || high >= 24 && cloud <= 45) addDress("sunProtection");
 
   if (high >= 34) addHealth("heatReduceActivity", 3);
   else if (high >= 30) addHealth("heatHydration", 2);
@@ -1351,6 +1387,7 @@ function renderProviders(results) {
           <dt>${strings.high}</dt><dd>${formatTemp(today?.high)}</dd>
           <dt>${strings.low}</dt><dd>${formatTemp(today?.low)}</dd>
           <dt>${strings.rain}</dt><dd>${formatMm(today?.precip)}</dd>
+          <dt>${strings.uv}</dt><dd>${formatUv(today?.uv)}</dd>
           <dt>${strings.wind}</dt><dd>${formatKmh(today?.wind)}</dd>
           <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(today?.windDirection)}</dd>
         </dl>
@@ -1381,6 +1418,7 @@ function loadingMetricMarkup() {
     metricMarkup("fa-temperature-half", strings.now, "...", strings.loading(providers.length)),
     metricMarkup("fa-arrows-up-down", strings.highLow, "...", strings.loading(providers.length)),
     metricMarkup("fa-cloud-rain", strings.precipitation, "...", strings.loading(providers.length)),
+    metricMarkup("fa-sun", strings.uv, "...", strings.loading(providers.length)),
     metricMarkup("fa-wind", strings.wind, "...", strings.loading(providers.length))
   ].join("");
 }
@@ -1519,6 +1557,10 @@ function formatKmh(value) {
 
 function formatPercent(value) {
   return Number.isFinite(value) ? `${Math.round(value)}%` : "n/a";
+}
+
+function formatUv(value) {
+  return Number.isFinite(value) ? value.toFixed(1) : "n/a";
 }
 
 function formatConfidence(value) {
