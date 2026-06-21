@@ -7,13 +7,13 @@
   <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Weather Median">
-  <link rel="manifest" href="manifest.webmanifest?v=2fc0431936db">
+  <link rel="manifest" href="manifest.webmanifest?v=5abd2e143e9d">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
   <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.0.0/css/all.min.css">
   <title>Hungary Weather Median</title>
-  <link rel="stylesheet" href="app.css?v=2fc0431936db">
+  <link rel="stylesheet" href="app.css?v=5abd2e143e9d">
   <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
 <body class="bg-base-200 text-base-content">
@@ -68,29 +68,27 @@
       <button class="btn btn-sm" id="updateReload" type="button">Reload</button>
     </div>
 
-    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
-      <h2 class="card-title" id="todayTitle">Today</h2>
+    <details class="accordion-section panel card bg-base-100 border border-base-300 shadow-sm" id="todaySection">
+      <summary><h2 class="card-title" id="todayTitle">Today</h2></summary>
       <div class="today-grid" id="today"></div>
       <div class="source-status-list" id="status"></div>
       <p class="note" id="medianNote">Median values ignore sources that fail or do not report a metric. Precipitation is the median daily sum, not a probability.</p>
-    </section>
+    </details>
 
-    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
-      <h2 class="card-title" id="forecastTitle">Forecast</h2>
+    <details class="accordion-section panel card bg-base-100 border border-base-300 shadow-sm" id="forecastSection">
+      <summary><h2 class="card-title" id="forecastTitle">Forecast</h2></summary>
       <div class="insight-panel" id="forecastInsight"></div>
       <div class="forecast-grid" id="forecast"></div>
-    </section>
+    </details>
 
-    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
-      <div class="map-head">
-        <h2 class="card-title" id="mapTitle">Weather Map</h2>
-      </div>
+    <details class="accordion-section panel card bg-base-100 border border-base-300 shadow-sm" id="mapSection">
+      <summary><h2 class="card-title" id="mapTitle">Weather Map</h2></summary>
       <iframe class="map-frame" id="weatherMap" title="Windy weather map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       <p class="note" id="mapNote">Visual Windy cloud layer only. It is not part of the median forecast calculation.</p>
-    </section>
+    </details>
 
-    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
-      <h2 class="card-title" id="advisoryTitle">Advisories</h2>
+    <details class="accordion-section panel card bg-base-100 border border-base-300 shadow-sm" id="advisorySection">
+      <summary><h2 class="card-title" id="advisoryTitle">Advisories</h2></summary>
       <div class="tabs tabs-box domain-tabs" role="tablist" aria-label="Advisory domains">
         <button class="tab active tab-active" id="agriTab" type="button" role="tab" aria-controls="agriPanel" aria-selected="true">Agriculture</button>
         <button class="tab" id="familyTab" type="button" role="tab" aria-controls="familyPanel" aria-selected="false">Family</button>
@@ -132,21 +130,21 @@
         <div class="family-grid" id="family"></div>
         <p class="note" id="familyNote">Practical weather-risk guidance only. It is not medical advice and does not account for personal health conditions.</p>
       </div>
-    </section>
+    </details>
 
-    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
-      <h2 class="card-title" id="providersTitle">Provider Snapshots</h2>
+    <details class="accordion-section panel card bg-base-100 border border-base-300 shadow-sm" id="providersSection">
+      <summary><h2 class="card-title" id="providersTitle">Provider Snapshots</h2></summary>
       <div class="source-comparison" id="sourceComparison"></div>
       <div class="providers" id="providers"></div>
-    </section>
+    </details>
 
-    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
-      <h2 class="card-title" id="sourcesTitle">Sources</h2>
+    <details class="accordion-section panel card bg-base-100 border border-base-300 shadow-sm" id="sourcesSection">
+      <summary><h2 class="card-title" id="sourcesTitle">Sources</h2></summary>
       <div id="sources"></div>
-    </section>
+    </details>
   </main>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-  <script src="app.js?v=2fc0431936db"></script>
+  <script src="app.js?v=5abd2e143e9d"></script>
 </body>
 </html>

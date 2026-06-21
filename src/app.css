@@ -133,9 +133,30 @@ section {
   margin-top: 16px;
 }
 
+.accordion-section {
+  margin-top: 16px;
+}
+
 .panel {
   border-radius: 8px;
   padding: 16px;
+}
+
+.accordion-section > summary {
+  cursor: pointer;
+  list-style: none;
+}
+
+.accordion-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.accordion-section > summary h2 {
+  margin-bottom: 0;
+}
+
+.accordion-section[open] > summary {
+  margin-bottom: 12px;
 }
 
 .advisory-panel .toolbar {

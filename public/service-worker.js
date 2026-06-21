@@ -1,10 +1,10 @@
-const CACHE_NAME = "weatherman-2fc0431936db";
+const CACHE_NAME = "weatherman-5abd2e143e9d";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/app.css?v=2fc0431936db",
-  "/app.js?v=2fc0431936db",
-  "/manifest.webmanifest?v=2fc0431936db",
+  "/app.css?v=5abd2e143e9d",
+  "/app.js?v=5abd2e143e9d",
+  "/manifest.webmanifest?v=5abd2e143e9d",
   "/icons/icon-192.png",
   "/icons/icon-512.png"
 ];

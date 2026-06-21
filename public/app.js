@@ -75,6 +75,8 @@ const PROVIDER_ID = Object.freeze({
   METNO: "metno"
 });
 const SETTINGS_KEY = "weatherman.settings.v1";
+const SECTION_IDS = Object.freeze(["todaySection", "forecastSection", "mapSection", "advisorySection", "providersSection", "sourcesSection"]);
+const DEFAULT_OPEN_SECTIONS = Object.freeze(["todaySection", "advisorySection"]);
 const FORECAST_HISTORY_PREFIX = "weatherman.forecastHistory.v1";
 const PROVIDER_CACHE_TTL_MS = 15 * 60 * 1000;
 const PROVIDER_TIMEOUT_MS = 10000;
@@ -146,6 +148,7 @@ const agriTab = document.querySelector("#agriTab");
 const familyTab = document.querySelector("#familyTab");
 const agriPanel = document.querySelector("#agriPanel");
 const familyPanel = document.querySelector("#familyPanel");
+const sectionAccordions = SECTION_IDS.map(id => document.querySelector(`#${id}`));
 let lastResults = [];
 let lastAggregate = null;
 let hourlyChart = null;
@@ -477,6 +480,10 @@ familyHighlightEl.addEventListener("click", event => {
   if (event.target.id === "familyReminder") enableFamilyReminder();
 });
 
+sectionAccordions.forEach(section => {
+  section.addEventListener("toggle", saveSettings);
+});
+
 [language, theme, crop, work].forEach(control => {
   control.addEventListener("change", () => {
     applyStaticText();
@@ -488,7 +495,10 @@ familyHighlightEl.addEventListener("click", event => {
 });
 
 updateThemeOptions();
-if (!loadSettings()) applyBrowserLocale();
+if (!loadSettings()) {
+  applyBrowserLocale();
+  applySectionState(DEFAULT_OPEN_SECTIONS);
+}
 applyStaticText();
 applyTheme();
 registerServiceWorker();
@@ -550,10 +560,17 @@ function loadSettings() {
     if (selectHasValue(crop, settings.crop)) crop.value = settings.crop;
     if (selectHasValue(work, settings.work)) work.value = settings.work;
     if (SUPPORTED_ADVISORY_DOMAINS.includes(settings.advisoryDomain)) setActiveDomain(settings.advisoryDomain);
+    if (Array.isArray(settings.openSections)) applySectionState(settings.openSections);
     return true;
   } catch {
     return false;
   }
+}
+
+function applySectionState(openSections) {
+  sectionAccordions.forEach(section => {
+    section.open = openSections.includes(section.id);
+  });
 }
 
 function saveSettings() {
@@ -568,7 +585,10 @@ function saveSettings() {
       theme: theme.value,
       crop: crop.value,
       work: work.value,
-      advisoryDomain: currentAdvisoryDomain()
+      advisoryDomain: currentAdvisoryDomain(),
+      openSections: sectionAccordions
+        .filter(section => section.open)
+        .map(section => section.id)
     }));
   } catch {
     // localStorage may be disabled; the page remains usable without persistence.
