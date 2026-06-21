@@ -5,19 +5,23 @@
 This repository is a static single-page weather application.
 
 - `src/` contains the source files for the static app.
+  - `src/index.html` contains the page markup.
+  - `src/app.css` contains the app styles.
+  - `src/app.js` contains the app JavaScript.
+  - `src/manifest.webmanifest`, `src/service-worker.js`, and `src/icons/` contain the PWA shell assets.
 - `public/` contains the Cloudflare Pages publish artefacts. Regenerate it from `src/` before deployment.
 - `Documentation/` contains project notes and ADR topic candidates.
 - `mise.toml` defines local tasks and deployment commands.
 - `start-codex-tmux.sh` starts a tmux workspace for development.
 
-There is no separate assets directory or module tree at present. Keep changes surgical unless the project grows enough to justify splitting files.
+Keep changes surgical. Source changes belong in `src/`; generated deployment artefacts belong in `public/`.
 
 ## Build, Test, and Development Commands
 
 Use mise for routine operations:
 
-- `mise run check` validates that the inline JavaScript in `index.html` parses.
-- `mise run sync-public` copies `index.html` to `public/index.html`.
+- `mise run check` validates that `src/app.js` parses.
+- `mise run sync-public` copies the app source files from `src/` to `public/`.
 - `mise run serve` serves the app locally on port `8000`.
 - `mise run deploy` runs validation, syncs the publish file, and deploys `public/` to Cloudflare Pages.
 - `mise run configure-production-branch` is a separate Cloudflare Pages configuration task. Do not include it in routine deploys.
@@ -39,6 +43,10 @@ There is no formal test framework yet. At minimum, run `mise run check` before d
 Use Conventional Commits for commit messages, for example `feat: add barley crop rules` or `docs: document deployment tasks`.
 
 Pull requests should describe the user-visible change, list manual checks performed, and include screenshots for visual changes.
+
+## Documentation Maintenance
+
+Keep documentation current when code changes. If a change affects structure, commands, deployment, testing, architecture decisions, or user-visible behaviour, update the relevant repository documentation in the same change.
 
 ## Security & Configuration Tips
 
