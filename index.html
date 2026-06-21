@@ -607,6 +607,7 @@
             <select id="work">
               <option value="seeding">Seeding</option>
               <option value="harvesting">Harvesting</option>
+              <option value="spraying">Spraying</option>
             </select>
           </label>
         </div>
@@ -656,7 +657,8 @@
     });
     const WORK = Object.freeze({
       SEEDING: "seeding",
-      HARVESTING: "harvesting"
+      HARVESTING: "harvesting",
+      SPRAYING: "spraying"
     });
     const SCORE = Object.freeze({
       GOOD: "good",
@@ -687,6 +689,12 @@
       RAPESEED_HEAT_RAIN_MM: 0.5,
       HARVEST_RAIN_POOR_MM: 3,
       HARVEST_RAIN_CAUTION_MM: 0.5,
+      SPRAY_RAIN_POOR_MM: 1,
+      SPRAY_RAIN_CAUTION_MM: 0.2,
+      SPRAY_WIND_POOR_KMH: 20,
+      SPRAY_WIND_CAUTION_KMH: 12,
+      SPRAY_HEAT_POOR_C: 30,
+      SPRAY_HEAT_CAUTION_C: 25,
       DRYING_WEAK_CLOUD_PERCENT: 75,
       WIND_POOR_KMH: 35,
       WIND_CAUTION_KMH: 22,
@@ -817,6 +825,7 @@
         rawData: "raw data",
         seeding: "Seeding",
         harvesting: "Harvesting",
+        spraying: "Spraying",
         rapeseed: "Rapeseed",
         wheat: "Wheat",
         barley: "Barley",
@@ -840,6 +849,9 @@
           rainCaution: "some rain may interrupt work",
           drySeedbed: "dry forecast may limit seedbed moisture",
           wetHarvest: "rain and wet crop risk are too high for harvest",
+          sprayRain: "rain may wash spray off before it can work",
+          sprayDrift: "wind increases spray drift risk",
+          sprayHeat: "heat can reduce spray accuracy and crop safety",
           dryingWeak: "cloud cover suggests weak drying",
           windPoor: "wind is too strong for accurate field operations",
           windCaution: "wind may affect machinery accuracy and losses",
@@ -922,6 +934,7 @@
         rawData: "nyers adat",
         seeding: "Vetés",
         harvesting: "Aratás",
+        spraying: "Permetezés",
         rapeseed: "Repce",
         wheat: "Búza",
         barley: "Árpa",
@@ -945,6 +958,9 @@
           rainCaution: "kisebb eső megszakíthatja a munkát",
           drySeedbed: "a száraz előrejelzés korlátozhatja a kelést",
           wetHarvest: "az eső és a nedves termény kockázata túl magas aratáshoz",
+          sprayRain: "az eső lemoshatja a permetet, mielőtt hatna",
+          sprayDrift: "a szél növeli az elsodródás kockázatát",
+          sprayHeat: "a meleg ronthatja a permetezés pontosságát és a növénybiztonságot",
           dryingWeak: "a felhőzet gyenge száradást jelez",
           windPoor: "a szél túl erős a pontos munkavégzéshez",
           windCaution: "a szél ronthatja a gépek pontosságát és növelheti a veszteséget",
@@ -1092,12 +1108,23 @@
       document.querySelector("#familyNote").textContent = strings.familyNote;
       updateOptionLabels(crop, SUPPORTED_CROPS);
       updateOptionLabels(work, SUPPORTED_WORK);
+      sortSelectOptions(language, locale);
+      sortSelectOptions(crop, locale);
+      sortSelectOptions(work, locale);
     }
 
     function updateOptionLabels(select, values) {
       values.forEach(value => {
         select.querySelector(`option[value="${value}"]`).textContent = t()[value];
       });
+    }
+
+    function sortSelectOptions(select, locale) {
+      const selected = select.value;
+      [...select.options]
+        .sort((a, b) => a.textContent.localeCompare(b.textContent, locale))
+        .forEach(option => select.append(option));
+      select.value = selected;
     }
 
     function renderAll(results, aggregate) {
@@ -1827,16 +1854,25 @@
 
         if ([CROP.CORN, CROP.SUNFLOWER].includes(cropKey) && low < AGRI_LIMITS.COLD_SENSITIVE_LOW_C) addReason("coldSensitive", 2);
         if (cropKey === CROP.RAPESEED && high >= AGRI_LIMITS.RAPESEED_HEAT_C && rain <= AGRI_LIMITS.RAPESEED_HEAT_RAIN_MM) addReason("rapeseedHeat", 2);
-      } else {
+      } else if (workKey === WORK.HARVESTING) {
         if (rain >= AGRI_LIMITS.HARVEST_RAIN_POOR_MM) addReason("wetHarvest", 3);
         else if (rain >= AGRI_LIMITS.HARVEST_RAIN_CAUTION_MM) addReason("rainCaution", 2);
         if (cloud >= AGRI_LIMITS.DRYING_WEAK_CLOUD_PERCENT) addReason("dryingWeak", 1);
         if ([CROP.RAPESEED, CROP.WHEAT, CROP.BARLEY].includes(cropKey) && rain >= AGRI_LIMITS.HARVEST_RAIN_CAUTION_MM) addReason("cerealHarvest", 1);
+      } else if (workKey === WORK.SPRAYING) {
+        if (rain >= AGRI_LIMITS.SPRAY_RAIN_POOR_MM) addReason("sprayRain", 3);
+        else if (rain >= AGRI_LIMITS.SPRAY_RAIN_CAUTION_MM) addReason("sprayRain", 1);
+        if (wind >= AGRI_LIMITS.SPRAY_WIND_POOR_KMH) addReason("sprayDrift", 3);
+        else if (wind >= AGRI_LIMITS.SPRAY_WIND_CAUTION_KMH) addReason("sprayDrift", 1);
+        if (high >= AGRI_LIMITS.SPRAY_HEAT_POOR_C) addReason("sprayHeat", 3);
+        else if (high >= AGRI_LIMITS.SPRAY_HEAT_CAUTION_C) addReason("sprayHeat", 1);
       }
 
-      if (wind >= AGRI_LIMITS.WIND_POOR_KMH) addReason("windPoor", 3);
-      else if (wind >= AGRI_LIMITS.WIND_CAUTION_KMH) addReason("windCaution", 1);
-      if (high >= AGRI_LIMITS.HEAT_STRESS_C) addReason("heatStress", 1);
+      if (workKey !== WORK.SPRAYING) {
+        if (wind >= AGRI_LIMITS.WIND_POOR_KMH) addReason("windPoor", 3);
+        else if (wind >= AGRI_LIMITS.WIND_CAUTION_KMH) addReason("windCaution", 1);
+        if (high >= AGRI_LIMITS.HEAT_STRESS_C) addReason("heatStress", 1);
+      }
       if (wetness >= AGRI_LIMITS.SATURATED_WETNESS) addReason("saturatedLand", 3);
       else if (wetness >= AGRI_LIMITS.PARTIAL_DRYING_WETNESS) addReason("partialDrying", 1);
 

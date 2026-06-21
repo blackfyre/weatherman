@@ -17,6 +17,11 @@ class Element {
     this.listeners[type] = listener;
   }
 
+  append(...children) {
+    this.options = this.options.filter(option => !children.includes(option));
+    this.options.push(...children);
+  }
+
   querySelector(selector) {
     const match = selector.match(/^option\[value="(.+)"\]$/);
     if (!match) return null;
@@ -35,7 +40,7 @@ for (const [id, values] of Object.entries({
   place: ["47.58,18.88,Nagykovacsi", "custom"],
   language: ["en-GB", "hu-HU"],
   crop: ["rapeseed", "wheat", "barley", "corn", "sunflower"],
-  work: ["seeding", "harvesting"]
+  work: ["seeding", "harvesting", "spraying"]
 })) {
   elements[id].options = values.map(value => ({ value, textContent: "" }));
   elements[id].value = values[0];
