@@ -165,6 +165,10 @@ section {
   white-space: normal;
 }
 
+.status-chip .status {
+  flex: 0 0 auto;
+}
+
 .status-chip.ok {
   border-color: color-mix(in oklab, var(--good) 35%, var(--line));
   background: var(--good-soft);

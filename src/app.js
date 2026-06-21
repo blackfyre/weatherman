@@ -1106,8 +1106,8 @@ function renderStatus(results) {
   statusEl.innerHTML = results.map(result => {
     const cls = result.ok ? "ok" : "bad";
     const text = result.ok ? `${result.provider.name}: ${result.hourly.length} hours, ${formatFreshness(result)}` : `${result.provider.name}: ${result.error}`;
-    const icon = result.ok ? "fa-circle-check" : "fa-triangle-exclamation";
-    return `<span class="status-chip ${cls}">${iconMarkup(icon)} ${escapeHtml(text)}</span>`;
+    const statusClass = result.ok ? "status-success" : "status-error";
+    return `<span class="status-chip ${cls}"><span class="status status-sm ${statusClass}" aria-hidden="true"></span>${escapeHtml(text)}</span>`;
   }).join("");
 }
 
