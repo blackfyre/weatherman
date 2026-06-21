@@ -242,6 +242,10 @@ const text = {
       windLayer: "wind-resistant outer layer",
       sunProtection: "hat, sunglasses and sunscreen for long outdoor time",
       comfortable: "ordinary outdoor plans look comfortable",
+      uvModerate: "UV exposure needs sunscreen for longer outdoor time",
+      uvHigh: "high UV; prefer shade and reduce late-morning to afternoon exposure",
+      uvVeryHigh: "very high UV; keep children's midday outdoor time short",
+      uvCloudBreaks: "cloud breaks could raise UV exposure quickly",
       heatHydration: "heat can affect anyone; plan water and shade",
       heatReduceActivity: "reduce strenuous midday outdoor activity",
       checkVulnerable: "check children, older adults and people with chronic conditions",
@@ -355,6 +359,10 @@ const text = {
       windLayer: "szélálló külső réteg",
       sunProtection: "sapka, napszemüveg és naptej hosszabb kinti időhöz",
       comfortable: "a szokásos kinti programok kényelmesnek tűnnek",
+      uvModerate: "az UV-sugárzás miatt hosszabb kinti időhöz naptej kell",
+      uvHigh: "magas UV; inkább árnyék és kevesebb késő délelőtti-délutáni kitettség",
+      uvVeryHigh: "nagyon magas UV; a gyerekek déli kinti ideje legyen rövid",
+      uvCloudBreaks: "a felhőzet felszakadozása gyorsan növelheti az UV-kitettséget",
       heatHydration: "a hőség bárkit érinthet; tervezzetek vízzel és árnyékkal",
       heatReduceActivity: "érdemes csökkenteni a megterhelő déli kinti aktivitást",
       checkVulnerable: "figyeljetek a gyerekekre, idősekre és krónikus betegekre",
@@ -1252,6 +1260,7 @@ function evaluateFamily(day) {
   const wind = day.wind ?? 0;
   const cloud = day.cloud ?? 100;
   const uv = day.uv ?? day.uvClearSky ?? 0;
+  const clearSkyUv = day.uvClearSky ?? 0;
 
   if (high >= 28) addDress("lightClothes");
   else if (low <= 0) addDress("coat");
@@ -1265,6 +1274,10 @@ function evaluateFamily(day) {
   if (high >= 34) addHealth("heatReduceActivity", 3);
   else if (high >= 30) addHealth("heatHydration", 2);
   if (high >= 30) addHealth("checkVulnerable", 1);
+  if (uv >= 8) addHealth("uvVeryHigh", 3);
+  else if (uv >= 6) addHealth("uvHigh", 2);
+  else if (uv >= 3) addHealth("uvModerate", 1);
+  if (clearSkyUv - uv >= 2 && clearSkyUv >= 6) addHealth("uvCloudBreaks", 1);
   if (low <= 0) addHealth("coldExposure", 2);
   if (low <= 8 && rain >= 1) addHealth("wetCold", 1);
   if (wind >= 35) addHealth("strongWind", 2);
