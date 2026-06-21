@@ -17,6 +17,10 @@ run = "node tests/smoke.mjs"
 description = "Serve the static site locally"
 run = "python3 -m http.server 8000"
 
+[tasks.tmux]
+description = "Start the Codex tmux workspace"
+run = "./start-codex-tmux.sh"
+
 [tasks.configure-production-branch]
 description = "Set the Cloudflare Pages production branch"
 run = """secretspec run -- curl --fail --silent --show-error --request PATCH "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/$CLOUDFLARE_PAGES_PROJECT" --header "Authorization: Bearer $CLOUDFLARE_API_TOKEN" --header "Content-Type: application/json" --data '{"production_branch":"main"}'"""
