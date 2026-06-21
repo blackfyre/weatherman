@@ -9,6 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="Weather Median">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.0.0/css/all.min.css">
   <title>Hungary Weather Median</title>
   <style>
     :root {
@@ -105,6 +106,11 @@
       font-size: 15px;
     }
 
+    .fa-solid {
+      width: 1em;
+      text-align: center;
+    }
+
     .subtle {
       color: var(--muted);
       font-size: 14px;
@@ -145,6 +151,10 @@
     }
 
     button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
       align-self: end;
       padding: 0 14px;
       background: var(--accent);
@@ -183,6 +193,9 @@
     }
 
     .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       border-radius: 999px;
       background: var(--pill);
       color: var(--muted);
@@ -215,7 +228,9 @@
     }
 
     .metric span {
-      display: block;
+      display: flex;
+      align-items: center;
+      gap: 7px;
       color: var(--muted);
       font-size: 13px;
       margin-bottom: 8px;
@@ -1099,19 +1114,19 @@
       document.querySelector("#languageLabel").textContent = strings.language;
       document.querySelector("#cropLabel").textContent = strings.crop;
       document.querySelector("#workLabel").textContent = strings.work;
-      refreshButton.textContent = strings.refresh;
-      locateButton.textContent = strings.locate;
-      document.querySelector("#todayTitle").textContent = strings.today;
-      document.querySelector("#forecastTitle").textContent = strings.forecast;
+      refreshButton.innerHTML = `${iconMarkup("fa-rotate-right")} ${escapeHtml(strings.refresh)}`;
+      locateButton.innerHTML = `${iconMarkup("fa-location-crosshairs")} ${escapeHtml(strings.locate)}`;
+      document.querySelector("#todayTitle").innerHTML = `${iconMarkup("fa-sun")} ${escapeHtml(strings.today)}`;
+      document.querySelector("#forecastTitle").innerHTML = `${iconMarkup("fa-cloud-sun")} ${escapeHtml(strings.forecast)}`;
       document.querySelector("#hourlyTitle").textContent = strings.hourly;
       document.querySelector("#hourlyNote").textContent = strings.hourlyNote;
-      document.querySelector("#mapTitle").textContent = strings.map;
+      document.querySelector("#mapTitle").innerHTML = `${iconMarkup("fa-map-location-dot")} ${escapeHtml(strings.map)}`;
       document.querySelector("#mapNote").textContent = strings.mapNote;
-      document.querySelector("#advisoryTitle").textContent = strings.advisories;
-      agriTab.textContent = strings.agriculture;
-      familyTab.textContent = strings.family;
-      document.querySelector("#providersTitle").textContent = strings.providers;
-      document.querySelector("#sourcesTitle").textContent = strings.sources;
+      document.querySelector("#advisoryTitle").innerHTML = `${iconMarkup("fa-clipboard-list")} ${escapeHtml(strings.advisories)}`;
+      agriTab.innerHTML = `${iconMarkup("fa-seedling")} ${escapeHtml(strings.agriculture)}`;
+      familyTab.innerHTML = `${iconMarkup("fa-people-roof")} ${escapeHtml(strings.family)}`;
+      document.querySelector("#providersTitle").innerHTML = `${iconMarkup("fa-satellite-dish")} ${escapeHtml(strings.providers)}`;
+      document.querySelector("#sourcesTitle").innerHTML = `${iconMarkup("fa-code")} ${escapeHtml(strings.sources)}`;
       document.querySelector("#medianNote").textContent = strings.medianNote;
       document.querySelector("#agriNote").textContent = strings.agriNote;
       document.querySelector("#familyNote").textContent = strings.familyNote;
@@ -1207,12 +1222,12 @@
 
     function useBrowserLocation() {
       if (!navigator.geolocation) {
-        statusEl.innerHTML = `<span class="pill bad">${escapeHtml(t().geolocationUnavailable)}</span>`;
+        statusEl.innerHTML = `<span class="pill bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationUnavailable)}</span>`;
         return;
       }
 
       locateButton.disabled = true;
-      statusEl.innerHTML = `<span class="pill">${escapeHtml(t().locating)}</span>`;
+      statusEl.innerHTML = `<span class="pill">${iconMarkup("fa-location-crosshairs")} ${escapeHtml(t().locating)}</span>`;
       navigator.geolocation.getCurrentPosition(
         position => {
           place.value = "custom";
@@ -1224,7 +1239,7 @@
         },
         () => {
           locateButton.disabled = false;
-          statusEl.innerHTML = `<span class="pill bad">${escapeHtml(t().geolocationFailed)}</span>`;
+          statusEl.innerHTML = `<span class="pill bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationFailed)}</span>`;
         },
         {
           enableHighAccuracy: false,
@@ -1261,7 +1276,7 @@
       familyEl.innerHTML = "";
       providersEl.innerHTML = "";
       sourcesEl.innerHTML = "";
-      statusEl.innerHTML = `<span class="pill">${escapeHtml(t().loading(providers.length))}</span>`;
+      statusEl.innerHTML = `<span class="pill">${iconMarkup("fa-cloud-arrow-down")} ${escapeHtml(t().loading(providers.length))}</span>`;
 
       const results = await Promise.all(providers.map(provider => fetchProvider(provider, coords)));
       const usable = results.filter(result => result.ok);
@@ -1282,7 +1297,7 @@
     function readCoords() {
       const coords = parseCoords();
       if (!coords) {
-        statusEl.innerHTML = `<span class="pill bad">${escapeHtml(t().invalidCoords)}</span>`;
+        statusEl.innerHTML = `<span class="pill bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().invalidCoords)}</span>`;
         return null;
       }
       return coords;
@@ -1550,17 +1565,18 @@
       statusEl.innerHTML = results.map(result => {
         const cls = result.ok ? "ok" : "bad";
         const text = result.ok ? `${result.provider.name}: ${result.hourly.length} hours` : `${result.provider.name}: ${result.error}`;
-        return `<span class="pill ${cls}">${escapeHtml(text)}</span>`;
+        const icon = result.ok ? "fa-circle-check" : "fa-triangle-exclamation";
+        return `<span class="pill ${cls}">${iconMarkup(icon)} ${escapeHtml(text)}</span>`;
       }).join("");
     }
 
     function renderToday(day, sourceCount) {
       const strings = t();
       todayEl.innerHTML = [
-        metricMarkup(strings.now, formatTemp(day.currentTemp), strings.activeSources(sourceCount)),
-        metricMarkup(strings.highLow, `${formatTemp(day.high)} / ${formatTemp(day.low)}`, strings.dailyRange),
-        metricMarkup(strings.precipitation, formatMm(day.precip), strings.dailyTotal),
-        metricMarkup(strings.wind, formatKmh(day.wind), `${strings.dailyMax} · ${formatWindDirection(day.windDirection)}`)
+        metricMarkup("fa-temperature-half", strings.now, formatTemp(day.currentTemp), strings.activeSources(sourceCount)),
+        metricMarkup("fa-arrows-up-down", strings.highLow, `${formatTemp(day.high)} / ${formatTemp(day.low)}`, strings.dailyRange),
+        metricMarkup("fa-cloud-rain", strings.precipitation, formatMm(day.precip), strings.dailyTotal),
+        metricMarkup("fa-wind", strings.wind, formatKmh(day.wind), `${strings.dailyMax} · ${formatWindDirection(day.windDirection)}`)
       ].join("");
     }
 
@@ -1571,9 +1587,9 @@
           <time datetime="${day.date}">${formatDate(day.date)}</time>
           <strong>${formatTemp(day.high)} / ${formatTemp(day.low)}</strong>
           <dl>
-            <dt>${strings.confidence}</dt><dd>${formatConfidence(day.confidence)}</dd>
-            <dt>${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
-            <dt>${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
+            <dt>${iconMarkup("fa-gauge-high")} ${strings.confidence}</dt><dd>${formatConfidence(day.confidence)}</dd>
+            <dt>${iconMarkup("fa-cloud-rain")} ${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
+            <dt>${iconMarkup("fa-wind")} ${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
             <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
             <dt>${strings.cloud}</dt><dd>${formatPercent(day.cloud)}</dd>
             <dt>${strings.sourceCount}</dt><dd>${day.sources}</dd>
@@ -1639,7 +1655,7 @@
       workWindowsEl.innerHTML = windows.map(window => `
         <article class="window-card ${window.evaluation.level}">
           <strong>${formatWindowRange(window.startKey, window.endKey)}</strong>
-          <span>${strings[window.evaluation.level]} · ${formatMm(window.summary.precip)} · ${formatKmh(window.summary.wind)}</span>
+          <span>${scoreIconMarkup(window.evaluation.level)} ${strings[window.evaluation.level]} · ${formatMm(window.summary.precip)} · ${formatKmh(window.summary.wind)}</span>
         </article>
       `).join("");
     }
@@ -1753,7 +1769,7 @@
           <article class="agri-card">
             <time datetime="${day.date}">${formatDate(day.date)}</time>
             <h3>${strings[crop.value]} - ${strings[work.value]}</h3>
-            <span class="score ${evaluation.level}">${strings[evaluation.level]}</span>
+            <span class="score ${evaluation.level}">${scoreIconMarkup(evaluation.level)} ${strings[evaluation.level]}</span>
             <dl>
               <dt>${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
               <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
@@ -1775,7 +1791,7 @@
           <article class="family-card">
             <time datetime="${day.date}">${formatDate(day.date)}</time>
             <h3>${strings.dress}</h3>
-            <span class="score ${advice.level}">${strings[advice.level]}</span>
+            <span class="score ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
             <ul class="reasons">
               ${advice.dress.map(reason => `<li>${escapeHtml(strings.familyReasons[reason])}</li>`).join("")}
             </ul>
@@ -1805,9 +1821,9 @@
             <time datetime="${tomorrow.date}">${formatDate(tomorrow.date)}</time>
             <h3>${escapeHtml(strings.tomorrowFamily)}</h3>
           </div>
-          <button id="familyReminder" type="button">${escapeHtml(strings.remindAtSeven)}</button>
+          <button id="familyReminder" type="button">${iconMarkup("fa-bell")} ${escapeHtml(strings.remindAtSeven)}</button>
         </div>
-        <span class="score ${advice.level}">${strings[advice.level]}</span>
+        <span class="score ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
         <p>${escapeHtml(strings.tomorrowSummary(strings[advice.level], dress, health))}</p>
       `;
     }
@@ -1816,7 +1832,7 @@
       const strings = t();
       const button = document.querySelector("#familyReminder");
       if (!("Notification" in window)) {
-        if (button) button.textContent = strings.reminderUnavailable;
+        if (button) button.innerHTML = `${iconMarkup("fa-bell-slash")} ${escapeHtml(strings.reminderUnavailable)}`;
         return;
       }
 
@@ -1824,12 +1840,12 @@
         ? "granted"
         : await Notification.requestPermission();
       if (permission !== "granted") {
-        if (button) button.textContent = strings.reminderDenied;
+        if (button) button.innerHTML = `${iconMarkup("fa-bell-slash")} ${escapeHtml(strings.reminderDenied)}`;
         return;
       }
 
       scheduleFamilyReminder();
-      if (button) button.textContent = strings.reminderEnabled;
+      if (button) button.innerHTML = `${iconMarkup("fa-bell")} ${escapeHtml(strings.reminderEnabled)}`;
     }
 
     function scheduleFamilyReminder() {
@@ -1984,7 +2000,7 @@
         if (!result.ok) {
           return `
             <article class="provider">
-              <h3>${escapeHtml(result.provider.name)}</h3>
+              <h3>${iconMarkup("fa-satellite-dish")} ${escapeHtml(result.provider.name)}</h3>
               <p class="error">${escapeHtml(result.error)}</p>
             </article>
           `;
@@ -1992,7 +2008,7 @@
         const today = dailyForProvider(result).find(day => day.date === budapestDateKey(new Date()));
         return `
           <article class="provider">
-            <h3>${escapeHtml(result.provider.name)}</h3>
+            <h3>${iconMarkup("fa-satellite-dish")} ${escapeHtml(result.provider.name)}</h3>
             <dl>
               <dt>${strings.now}</dt><dd>${formatTemp(today?.currentTemp)}</dd>
               <dt>${strings.high}</dt><dd>${formatTemp(today?.high)}</dd>
@@ -2011,7 +2027,7 @@
         const payload = result.ok ? result.raw : { error: result.error };
         return `
           <details>
-            <summary>${escapeHtml(result.provider.name)} ${escapeHtml(t().rawData)}</summary>
+            <summary>${iconMarkup("fa-file-code")} ${escapeHtml(result.provider.name)} ${escapeHtml(t().rawData)}</summary>
             <pre>${escapeHtml(JSON.stringify({
               url: result.url,
               fetchedAt: result.fetchedAt,
@@ -2025,17 +2041,17 @@
     function loadingMetricMarkup() {
       const strings = t();
       return [
-        metricMarkup(strings.now, "...", strings.loading(providers.length)),
-        metricMarkup(strings.highLow, "...", strings.loading(providers.length)),
-        metricMarkup(strings.precipitation, "...", strings.loading(providers.length)),
-        metricMarkup(strings.wind, "...", strings.loading(providers.length))
+        metricMarkup("fa-temperature-half", strings.now, "...", strings.loading(providers.length)),
+        metricMarkup("fa-arrows-up-down", strings.highLow, "...", strings.loading(providers.length)),
+        metricMarkup("fa-cloud-rain", strings.precipitation, "...", strings.loading(providers.length)),
+        metricMarkup("fa-wind", strings.wind, "...", strings.loading(providers.length))
       ].join("");
     }
 
-    function metricMarkup(label, value, help) {
+    function metricMarkup(icon, label, value, help) {
       return `
         <article class="metric">
-          <span>${label}</span>
+          <span>${iconMarkup(icon)} ${label}</span>
           <strong>${value}</strong>
           <small>${help}</small>
         </article>
@@ -2191,6 +2207,16 @@
 
     function noteMarkup(message) {
       return `<p class="note">${escapeHtml(message)}</p>`;
+    }
+
+    function iconMarkup(icon) {
+      return `<i class="fa-solid ${icon}" aria-hidden="true"></i>`;
+    }
+
+    function scoreIconMarkup(level) {
+      if (level === SCORE.GOOD) return iconMarkup("fa-circle-check");
+      if (level === SCORE.CAUTION) return iconMarkup("fa-triangle-exclamation");
+      return iconMarkup("fa-circle-xmark");
     }
   </script>
 </body>
