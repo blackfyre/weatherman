@@ -3,11 +3,11 @@
 
 [tasks.check]
 description = "Validate that the page script parses"
-run = "node -e \"const fs=require('fs'); const html=fs.readFileSync('index.html','utf8'); const m=html.match(/<script>([\\s\\S]*)<\\/script>/); if(!m) throw new Error('script tag not found'); new Function(m[1]); console.log('script parses')\""
+run = "node -e \"const fs=require('fs'); new Function(fs.readFileSync('app.js','utf8')); console.log('script parses')\""
 
 [tasks.sync-public]
 description = "Copy the installable web app into the Cloudflare Pages publish directory"
-run = "mkdir -p public/icons && cp index.html public/index.html && cp manifest.webmanifest service-worker.js public/ && cp icons/icon-192.png icons/icon-512.png public/icons/"
+run = "mkdir -p public/icons && cp index.html app.css app.js manifest.webmanifest service-worker.js public/ && cp icons/icon-192.png icons/icon-512.png public/icons/"
 
 [tasks.smoke]
 description = "Run a dependency-free page initialisation smoke test"

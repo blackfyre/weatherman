@@ -11,7 +11,8 @@ Scope: browser-local preference storage such as `localStorage`, last-used filter
 Decision direction:
 
 - Store user convenience settings locally when it improves the experience.
-- Do not store fetched provider payloads, aggregated forecasts, permissions, or business-authoritative state in browser preference storage.
+- Do not store fetched provider payloads, permissions, or business-authoritative state in browser preference storage.
+- Bounded derived forecast snapshots may be stored locally when they support non-authoritative UX features such as forecast confidence, provided they are compact, validated on read, safe to discard, and never treated as source data.
 - Treat locally stored settings as hints that may be missing, stale, malformed, or unavailable.
 - Validate restored values against explicit supported value sets before using them.
 

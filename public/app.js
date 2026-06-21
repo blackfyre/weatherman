@@ -1,0 +1,1557 @@
+const zone = "Europe/Budapest";
+const forecastDays = 5;
+const openMeteoHourly = "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover";
+const LOCALE = Object.freeze({
+  EN_GB: "en-GB",
+  HU_HU: "hu-HU"
+});
+const CROP = Object.freeze({
+  RAPESEED: "rapeseed",
+  WHEAT: "wheat",
+  BARLEY: "barley",
+  CORN: "corn",
+  SUNFLOWER: "sunflower"
+});
+const WORK = Object.freeze({
+  SEEDING: "seeding",
+  HARVESTING: "harvesting",
+  SPRAYING: "spraying"
+});
+const SCORE = Object.freeze({
+  GOOD: "good",
+  CAUTION: "caution",
+  POOR: "poor"
+});
+const ADVISORY_DOMAIN = Object.freeze({
+  AGRI: "agri",
+  FAMILY: "family"
+});
+const SUPPORTED_LOCALES = Object.freeze([LOCALE.EN_GB, LOCALE.HU_HU]);
+const SUPPORTED_CROPS = Object.freeze(Object.values(CROP));
+const SUPPORTED_WORK = Object.freeze(Object.values(WORK));
+const SUPPORTED_ADVISORY_DOMAINS = Object.freeze(Object.values(ADVISORY_DOMAIN));
+const COORD_LIMITS = Object.freeze({
+  LAT_MIN: -90,
+  LAT_MAX: 90,
+  LON_MIN: -180,
+  LON_MAX: 180
+});
+const AGRI_LIMITS = Object.freeze({
+  SEEDING_RAIN_POOR_MM: 8,
+  SEEDING_RAIN_CAUTION_MM: 2,
+  DRY_SEEDBED_RAIN_MM: 0.2,
+  DRY_SEEDBED_HIGH_C: 30,
+  COLD_SENSITIVE_LOW_C: 10,
+  RAPESEED_HEAT_C: 29,
+  RAPESEED_HEAT_RAIN_MM: 0.5,
+  HARVEST_RAIN_POOR_MM: 3,
+  HARVEST_RAIN_CAUTION_MM: 0.5,
+  SPRAY_RAIN_POOR_MM: 1,
+  SPRAY_RAIN_CAUTION_MM: 0.2,
+  SPRAY_WIND_POOR_KMH: 20,
+  SPRAY_WIND_CAUTION_KMH: 12,
+  SPRAY_HEAT_POOR_C: 30,
+  SPRAY_HEAT_CAUTION_C: 25,
+  DRYING_WEAK_CLOUD_PERCENT: 75,
+  WIND_POOR_KMH: 35,
+  WIND_CAUTION_KMH: 22,
+  HEAT_STRESS_C: 34,
+  SATURATED_WETNESS: 4,
+  PARTIAL_DRYING_WETNESS: 2
+});
+const PROVIDER_ID = Object.freeze({
+  ECMWF: "ecmwf",
+  DWD: "dwd",
+  METEOFRANCE: "meteofrance",
+  GFS: "gfs",
+  METNO: "metno"
+});
+const SETTINGS_KEY = "weatherman.settings.v1";
+const FORECAST_HISTORY_PREFIX = "weatherman.forecastHistory.v1";
+const PROVIDER_CACHE_TTL_MS = 15 * 60 * 1000;
+const MAX_FORECAST_SNAPSHOTS = 6;
+const providerCache = new Map();
+// Provider adapters map raw API payloads into this canonical hourly shape:
+// { key, date, temp, precip, wind, windDirection, cloud } with Budapest-local time and metric units.
+const providers = [
+  {
+    id: PROVIDER_ID.ECMWF,
+    name: "ECMWF IFS",
+    url: coords => openMeteoUrl("/v1/ecmwf", coords)
+  },
+  {
+    id: PROVIDER_ID.DWD,
+    name: "DWD ICON",
+    url: coords => openMeteoUrl("/v1/dwd-icon", coords)
+  },
+  {
+    id: PROVIDER_ID.METEOFRANCE,
+    name: "Meteo-France",
+    url: coords => openMeteoUrl("/v1/meteofrance", coords)
+  },
+  {
+    id: PROVIDER_ID.GFS,
+    name: "NOAA GFS",
+    url: coords => openMeteoUrl("/v1/gfs", coords)
+  },
+  {
+    id: PROVIDER_ID.METNO,
+    name: "MET Norway",
+    url: coords => `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${coords.lat}&lon=${coords.lon}`,
+    mapResponse: normaliseMetNo
+  }
+];
+
+const todayEl = document.querySelector("#today");
+const forecastEl = document.querySelector("#forecast");
+const hourlyChartCanvas = document.querySelector("#hourlyChart");
+const workWindowsEl = document.querySelector("#workWindows");
+const weatherMap = document.querySelector("#weatherMap");
+const agriEl = document.querySelector("#agri");
+const familyHighlightEl = document.querySelector("#familyHighlight");
+const familyEl = document.querySelector("#family");
+const providersEl = document.querySelector("#providers");
+const sourcesEl = document.querySelector("#sources");
+const statusEl = document.querySelector("#status");
+const refreshButton = document.querySelector("#refresh");
+const locateButton = document.querySelector("#locate");
+const controls = document.querySelector("#controls");
+const place = document.querySelector("#place");
+const lat = document.querySelector("#lat");
+const lon = document.querySelector("#lon");
+const language = document.querySelector("#language");
+const crop = document.querySelector("#crop");
+const work = document.querySelector("#work");
+const agriTab = document.querySelector("#agriTab");
+const familyTab = document.querySelector("#familyTab");
+const agriPanel = document.querySelector("#agriPanel");
+const familyPanel = document.querySelector("#familyPanel");
+let lastResults = [];
+let lastAggregate = null;
+let hourlyChart = null;
+let familyReminderTimer = null;
+
+const text = {
+  [LOCALE.EN_GB]: {
+    title: "Hungary Weather Median",
+    subtitle: "Median forecast from Europe/Hungary-relevant public sources. Raw responses stay available below.",
+    place: "Place",
+    lat: "Latitude",
+    lon: "Longitude",
+    language: "Language",
+    crop: "Crop",
+    work: "Work",
+    refresh: "Refresh",
+    locate: "Use my location",
+    today: "Today",
+    forecast: "Forecast",
+    hourly: "Hourly Work Window",
+    hourlyNote: "Hourly median for the next 48 hours. Shaded 6-hour windows use the selected crop and work rules.",
+    map: "Radar Map",
+    mapNote: "Visual Windy layer only. It is not part of the median forecast calculation.",
+    advisories: "Advisories",
+    agriculture: "Agricultural Work",
+    family: "Family",
+    providers: "Provider Snapshots",
+    sources: "Sources",
+    medianNote: "Median values ignore sources that fail or do not report a metric. Precipitation is the median daily sum, not a probability.",
+    agriNote: "Heuristic field-work guidance only. It does not include soil moisture, crop stage, machinery limits or field access.",
+    familyNote: "Practical weather-risk guidance only. It is not medical advice and does not account for personal health conditions.",
+    loading: count => `Loading ${count} sources...`,
+    invalidCoords: "Latitude must be between -90 and 90. Longitude must be between -180 and 180.",
+    locating: "Waiting for browser location permission...",
+    geolocationUnavailable: "Browser location is not available.",
+    geolocationFailed: "Could not read browser location.",
+    now: "Now",
+    activeSources: count => `${count} active sources`,
+    highLow: "High / low",
+    dailyRange: "Median daily range",
+    precipitation: "Precipitation",
+    dailyTotal: "Median daily total",
+    wind: "Wind",
+    dailyMax: "Median daily max",
+    rulingWindDirection: "Ruling direction",
+    chartUnavailable: "Chart library unavailable.",
+    tempChart: "Temperature",
+    rainChart: "Rain",
+    windChart: "Wind",
+    workWindow: "Work window",
+    confidence: "Confidence",
+    rain: "Rain",
+    cloud: "Cloud",
+    sourceCount: "Sources",
+    high: "High",
+    low: "Low",
+    rawData: "raw data",
+    seeding: "Seeding",
+    harvesting: "Harvesting",
+    spraying: "Spraying",
+    rapeseed: "Rapeseed",
+    wheat: "Wheat",
+    barley: "Barley",
+    corn: "Corn",
+    sunflower: "Sunflower",
+    dress: "Dress",
+    health: "Health risks",
+    tomorrowFamily: "Tomorrow for the kids",
+    tomorrowSummary: (level, dress, health) => `${level}. ${dress}. ${health}.`,
+    remindAtSeven: "Notify at 19:00",
+    reminderUnavailable: "Notifications are not available in this browser.",
+    reminderEnabled: "Reminder set for 19:00 while this app is open.",
+    reminderDenied: "Notification permission was not granted.",
+    reminderTitle: "Tomorrow's weather",
+    good: "Good",
+    caution: "Caution",
+    poor: "Poor",
+    noData: "No usable forecast data",
+    reasons: {
+      rainPoor: "rain makes field work and soil contact unreliable",
+      rainCaution: "some rain may interrupt work",
+      drySeedbed: "dry forecast may limit seedbed moisture",
+      wetHarvest: "rain and wet crop risk are too high for harvest",
+      sprayRain: "rain may wash spray off before it can work",
+      sprayDrift: "wind increases spray drift risk",
+      sprayHeat: "heat can reduce spray accuracy and crop safety",
+      dryingWeak: "cloud cover suggests weak drying",
+      windPoor: "wind is too strong for accurate field operations",
+      windCaution: "wind may affect machinery accuracy and losses",
+      coldSensitive: "cold nights may slow emergence",
+      heatStress: "high heat increases crop and operator stress",
+      rapeseedHeat: "rapeseed seeding is sensitive to dry heat",
+      cerealHarvest: "small-grain harvest needs a dry window",
+      saturatedLand: "heavy earlier rain may leave the land too wet for field work",
+      partialDrying: "recent rain may still need more drying time",
+      workable: "weather window looks workable on the available forecast",
+      noData: "no usable forecast data"
+    },
+    familyReasons: {
+      lightClothes: "light breathable clothes",
+      warmLayer: "warm layer for cooler parts of the day",
+      coat: "coat, hat and gloves for cold exposure",
+      rainGear: "rain jacket or umbrella",
+      windLayer: "wind-resistant outer layer",
+      sunProtection: "hat, sunglasses and sunscreen for long outdoor time",
+      comfortable: "ordinary outdoor plans look comfortable",
+      heatHydration: "heat can affect anyone; plan water and shade",
+      heatReduceActivity: "reduce strenuous midday outdoor activity",
+      checkVulnerable: "check children, older adults and people with chronic conditions",
+      coldExposure: "cold exposure risk; keep children warm and dry",
+      wetCold: "rain with cool air can increase chill risk",
+      strongWind: "strong wind can make walking, cycling and playground time harder",
+      heavyRain: "heavy rain may disrupt school runs and outdoor plans",
+      noData: "no usable forecast data"
+    }
+  },
+  [LOCALE.HU_HU]: {
+    title: "Magyarországi időjárási medián",
+    subtitle: "Medián előrejelzés Európához és Magyarországhoz releváns nyilvános forrásokból. A nyers válaszok lent elérhetők.",
+    place: "Hely",
+    lat: "Szélesség",
+    lon: "Hosszúság",
+    language: "Nyelv",
+    crop: "Kultúra",
+    work: "Munka",
+    refresh: "Frissítés",
+    locate: "Saját helyzet",
+    today: "Ma",
+    forecast: "Előrejelzés",
+    hourly: "Óránkénti munkablak",
+    hourlyNote: "Óránkénti medián a következő 48 órára. Az árnyékolt 6 órás ablakok a kiválasztott kultúra és munka szabályait használják.",
+    map: "Radartérkép",
+    mapNote: "Csak vizuális Windy réteg. Nem része a medián előrejelzés számításának.",
+    advisories: "Tanácsok",
+    agriculture: "Mezőgazdasági munka",
+    family: "Család",
+    providers: "Források röviden",
+    sources: "Nyers források",
+    medianNote: "A medián értékek kihagyják a hibás vagy hiányos forrásokat. A csapadék napi medián összeg, nem valószínűség.",
+    agriNote: "Csak heurisztikus munkaszervezési jelzés. Nem tartalmaz talajnedvességet, fenológiai állapotot, gépkorlátot vagy területi megközelítést.",
+    familyNote: "Csak gyakorlati időjárási kockázati jelzés. Nem orvosi tanács, és nem veszi figyelembe az egyéni egészségi állapotot.",
+    loading: count => `${count} forrás betöltése...`,
+    invalidCoords: "A szélességnek -90 és 90, a hosszúságnak -180 és 180 között kell lennie.",
+    locating: "Várakozás a böngésző helymeghatározási engedélyére...",
+    geolocationUnavailable: "A böngésző helymeghatározása nem elérhető.",
+    geolocationFailed: "Nem sikerült beolvasni a böngésző helyzetét.",
+    now: "Most",
+    activeSources: count => `${count} aktív forrás`,
+    highLow: "Max / min",
+    dailyRange: "Medián napi tartomány",
+    precipitation: "Csapadék",
+    dailyTotal: "Medián napi összeg",
+    wind: "Szél",
+    dailyMax: "Medián napi maximum",
+    rulingWindDirection: "Uralkodó irány",
+    chartUnavailable: "A diagramkönyvtár nem elérhető.",
+    tempChart: "Hőmérséklet",
+    rainChart: "Eső",
+    windChart: "Szél",
+    workWindow: "Munkablak",
+    confidence: "Bizalom",
+    rain: "Eső",
+    cloud: "Felhő",
+    sourceCount: "Forrás",
+    high: "Max",
+    low: "Min",
+    rawData: "nyers adat",
+    seeding: "Vetés",
+    harvesting: "Aratás",
+    spraying: "Permetezés",
+    rapeseed: "Repce",
+    wheat: "Búza",
+    barley: "Árpa",
+    corn: "Kukorica",
+    sunflower: "Napraforgó",
+    dress: "Öltözet",
+    health: "Egészségi kockázatok",
+    tomorrowFamily: "Holnap a gyerekeknek",
+    tomorrowSummary: (level, dress, health) => `${level}. ${dress}. ${health}.`,
+    remindAtSeven: "Értesítés 19:00-kor",
+    reminderUnavailable: "A böngésző nem támogatja az értesítéseket.",
+    reminderEnabled: "Emlékeztető beállítva 19:00-ra, amíg az app nyitva van.",
+    reminderDenied: "Az értesítési engedély nincs megadva.",
+    reminderTitle: "Holnapi időjárás",
+    good: "Jó",
+    caution: "Óvatosan",
+    poor: "Nem ajánlott",
+    noData: "Nincs használható előrejelzés",
+    reasons: {
+      rainPoor: "az eső bizonytalanná teszi a munkát és a mag-talaj kapcsolatot",
+      rainCaution: "kisebb eső megszakíthatja a munkát",
+      drySeedbed: "a száraz előrejelzés korlátozhatja a kelést",
+      wetHarvest: "az eső és a nedves termény kockázata túl magas aratáshoz",
+      sprayRain: "az eső lemoshatja a permetet, mielőtt hatna",
+      sprayDrift: "a szél növeli az elsodródás kockázatát",
+      sprayHeat: "a meleg ronthatja a permetezés pontosságát és a növénybiztonságot",
+      dryingWeak: "a felhőzet gyenge száradást jelez",
+      windPoor: "a szél túl erős a pontos munkavégzéshez",
+      windCaution: "a szél ronthatja a gépek pontosságát és növelheti a veszteséget",
+      coldSensitive: "a hideg éjszakák lassíthatják a kelést",
+      heatStress: "a nagy meleg növeli a növényi és kezelői stresszt",
+      rapeseedHeat: "a repce vetése érzékeny a száraz melegre",
+      cerealHarvest: "a gabonaaratásnak száraz ablak kell",
+      saturatedLand: "a korábbi nagy eső miatt a terület még túl nedves lehet a munkához",
+      partialDrying: "a friss csapadék után még száradási időre lehet szükség",
+      workable: "az elérhető előrejelzés alapján a munkablak használhatónak tűnik",
+      noData: "nincs használható előrejelzés"
+    },
+    familyReasons: {
+      lightClothes: "könnyű, jól szellőző ruházat",
+      warmLayer: "melegebb réteg a hűvösebb napszakokra",
+      coat: "kabát, sapka és kesztyű hideg kitettséghez",
+      rainGear: "esőkabát vagy esernyő",
+      windLayer: "szélálló külső réteg",
+      sunProtection: "sapka, napszemüveg és naptej hosszabb kinti időhöz",
+      comfortable: "a szokásos kinti programok kényelmesnek tűnnek",
+      heatHydration: "a hőség bárkit érinthet; tervezzetek vízzel és árnyékkal",
+      heatReduceActivity: "érdemes csökkenteni a megterhelő déli kinti aktivitást",
+      checkVulnerable: "figyeljetek a gyerekekre, idősekre és krónikus betegekre",
+      coldExposure: "hideg kitettségi kockázat; a gyerekek maradjanak melegen és szárazon",
+      wetCold: "az eső és hűvös levegő növelheti az áthűlés kockázatát",
+      strongWind: "az erős szél nehezítheti a sétát, biciklizést és játszóterezést",
+      heavyRain: "a nagy eső zavarhatja az iskolába járást és a kinti programokat",
+      noData: "nincs használható előrejelzés"
+    }
+  }
+};
+
+place.addEventListener("change", () => {
+  if (place.value === "custom") return;
+  const [nextLat, nextLon] = place.value.split(",");
+  lat.value = nextLat;
+  lon.value = nextLon;
+  saveSettings();
+});
+
+controls.addEventListener("submit", event => {
+  event.preventDefault();
+  saveSettings();
+  loadWeather();
+});
+
+locateButton.addEventListener("click", useBrowserLocation);
+agriTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.AGRI, true));
+familyTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.FAMILY, true));
+familyHighlightEl.addEventListener("click", event => {
+  if (event.target.id === "familyReminder") enableFamilyReminder();
+});
+
+[language, crop, work].forEach(control => {
+  control.addEventListener("change", () => {
+    applyStaticText();
+    updateMap();
+    saveSettings();
+    rerenderCachedWeather();
+  });
+});
+
+if (!loadSettings()) applyBrowserLocale();
+applyStaticText();
+registerServiceWorker();
+loadWeather();
+
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+  navigator.serviceWorker.register("service-worker.js").catch(() => {});
+}
+
+function t() {
+  const locale = SUPPORTED_LOCALES.includes(language.value) ? language.value : LOCALE.EN_GB;
+  return text[locale];
+}
+
+function loadSettings() {
+  try {
+    const settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null");
+    if (!settings) return false;
+    if (selectHasValue(place, settings.place)) place.value = settings.place;
+    if (Number.isFinite(settings.lat)) lat.value = String(settings.lat);
+    if (Number.isFinite(settings.lon)) lon.value = String(settings.lon);
+    if (selectHasValue(language, settings.language)) language.value = settings.language;
+    if (selectHasValue(crop, settings.crop)) crop.value = settings.crop;
+    if (selectHasValue(work, settings.work)) work.value = settings.work;
+    if (SUPPORTED_ADVISORY_DOMAINS.includes(settings.advisoryDomain)) setActiveDomain(settings.advisoryDomain);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function saveSettings() {
+  try {
+    const coords = parseCoords();
+    if (!coords) return;
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+      place: place.value,
+      lat: coords.lat,
+      lon: coords.lon,
+      language: language.value,
+      crop: crop.value,
+      work: work.value,
+      advisoryDomain: currentAdvisoryDomain()
+    }));
+  } catch {
+    // localStorage may be disabled; the page remains usable without persistence.
+  }
+}
+
+function selectHasValue(select, value) {
+  return [...select.options].some(option => option.value === value);
+}
+
+function applyStaticText() {
+  const strings = t();
+  const locale = SUPPORTED_LOCALES.includes(language.value) ? language.value : LOCALE.EN_GB;
+  document.documentElement.lang = locale;
+  document.title = strings.title;
+  document.querySelector("#title").textContent = strings.title;
+  document.querySelector("#subtitle").textContent = strings.subtitle;
+  document.querySelector("#placeLabel").textContent = strings.place;
+  document.querySelector("#latLabel").textContent = strings.lat;
+  document.querySelector("#lonLabel").textContent = strings.lon;
+  document.querySelector("#languageLabel").textContent = strings.language;
+  document.querySelector("#cropLabel").textContent = strings.crop;
+  document.querySelector("#workLabel").textContent = strings.work;
+  refreshButton.innerHTML = `${iconMarkup("fa-rotate-right")} ${escapeHtml(strings.refresh)}`;
+  locateButton.innerHTML = `${iconMarkup("fa-location-crosshairs")} ${escapeHtml(strings.locate)}`;
+  document.querySelector("#todayTitle").innerHTML = `${iconMarkup("fa-sun")} ${escapeHtml(strings.today)}`;
+  document.querySelector("#forecastTitle").innerHTML = `${iconMarkup("fa-cloud-sun")} ${escapeHtml(strings.forecast)}`;
+  document.querySelector("#hourlyTitle").textContent = strings.hourly;
+  document.querySelector("#hourlyNote").textContent = strings.hourlyNote;
+  document.querySelector("#mapTitle").innerHTML = `${iconMarkup("fa-map-location-dot")} ${escapeHtml(strings.map)}`;
+  document.querySelector("#mapNote").textContent = strings.mapNote;
+  document.querySelector("#advisoryTitle").innerHTML = `${iconMarkup("fa-clipboard-list")} ${escapeHtml(strings.advisories)}`;
+  agriTab.innerHTML = `${iconMarkup("fa-seedling")} ${escapeHtml(strings.agriculture)}`;
+  familyTab.innerHTML = `${iconMarkup("fa-people-roof")} ${escapeHtml(strings.family)}`;
+  document.querySelector("#providersTitle").innerHTML = `${iconMarkup("fa-satellite-dish")} ${escapeHtml(strings.providers)}`;
+  document.querySelector("#sourcesTitle").innerHTML = `${iconMarkup("fa-code")} ${escapeHtml(strings.sources)}`;
+  document.querySelector("#medianNote").textContent = strings.medianNote;
+  document.querySelector("#agriNote").textContent = strings.agriNote;
+  document.querySelector("#familyNote").textContent = strings.familyNote;
+  updateOptionLabels(crop, SUPPORTED_CROPS);
+  updateOptionLabels(work, SUPPORTED_WORK);
+  sortSelectOptions(language, locale);
+  sortSelectOptions(crop, locale);
+  sortSelectOptions(work, locale);
+}
+
+function updateOptionLabels(select, values) {
+  values.forEach(value => {
+    select.querySelector(`option[value="${value}"]`).textContent = t()[value];
+  });
+}
+
+function sortSelectOptions(select, locale) {
+  const selected = select.value;
+  [...select.options]
+    .sort((a, b) => a.textContent.localeCompare(b.textContent, locale))
+    .forEach(option => select.append(option));
+  select.value = selected;
+}
+
+function renderAll(results, aggregate) {
+  const usable = results.filter(result => result.ok);
+  renderStatus(results);
+  renderToday(aggregate.today, usable.length);
+  renderForecast(aggregate.days);
+  renderHourlyWork(usable);
+  renderAgriculture(aggregate.days);
+  renderFamily(aggregate.days);
+  renderProviders(results);
+  renderSources(results);
+}
+
+function rerenderCachedWeather() {
+  if (lastAggregate) renderAll(lastResults, lastAggregate);
+}
+
+function setActiveDomain(domain, persist = false) {
+  const familyActive = domain === ADVISORY_DOMAIN.FAMILY;
+  agriTab.classList.toggle("active", !familyActive);
+  familyTab.classList.toggle("active", familyActive);
+  agriTab.setAttribute("aria-selected", String(!familyActive));
+  familyTab.setAttribute("aria-selected", String(familyActive));
+  agriPanel.hidden = familyActive;
+  familyPanel.hidden = !familyActive;
+  if (!familyActive && hourlyChart) hourlyChart.resize();
+  if (persist) saveSettings();
+}
+
+function currentAdvisoryDomain() {
+  return familyTab.classList.contains("active") ? ADVISORY_DOMAIN.FAMILY : ADVISORY_DOMAIN.AGRI;
+}
+
+function updateMap() {
+  const coords = readCoords();
+  if (!coords) return;
+  const params = new URLSearchParams({
+    lat: coords.lat.toFixed(4),
+    lon: coords.lon.toFixed(4),
+    detailLat: coords.lat.toFixed(4),
+    detailLon: coords.lon.toFixed(4),
+    width: "650",
+    height: "450",
+    zoom: "8",
+    level: "surface",
+    overlay: "clouds",
+    product: "ecmwf",
+    menu: "",
+    message: "true",
+    marker: "true",
+    calendar: "now",
+    pressure: "",
+    type: "map",
+    location: "coordinates",
+    detail: "",
+    metricWind: "km/h",
+    metricTemp: "°C",
+    radarRange: "-1"
+  });
+  weatherMap.src = `https://embed.windy.com/embed2.html?${params}`;
+}
+
+function applyBrowserLocale() {
+  const browserLocale = (navigator.languages || [navigator.language])
+    .filter(Boolean)
+    .map(locale => locale.toLowerCase())
+    .find(locale => locale.startsWith("hu"));
+  language.value = browserLocale ? LOCALE.HU_HU : LOCALE.EN_GB;
+}
+
+function useBrowserLocation() {
+  if (!navigator.geolocation) {
+    statusEl.innerHTML = `<span class="pill bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationUnavailable)}</span>`;
+    return;
+  }
+
+  locateButton.disabled = true;
+  statusEl.innerHTML = `<span class="pill">${iconMarkup("fa-location-crosshairs")} ${escapeHtml(t().locating)}</span>`;
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      place.value = "custom";
+      lat.value = position.coords.latitude.toFixed(5);
+      lon.value = position.coords.longitude.toFixed(5);
+      locateButton.disabled = false;
+      saveSettings();
+      loadWeather();
+    },
+    () => {
+      locateButton.disabled = false;
+      statusEl.innerHTML = `<span class="pill bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationFailed)}</span>`;
+    },
+    {
+      enableHighAccuracy: false,
+      timeout: 10000,
+      maximumAge: 600000
+    }
+  );
+}
+
+function openMeteoUrl(path, coords) {
+  const params = new URLSearchParams({
+    latitude: coords.lat,
+    longitude: coords.lon,
+    hourly: openMeteoHourly,
+    forecast_days: String(forecastDays),
+    timezone: zone,
+    wind_speed_unit: "kmh",
+    precipitation_unit: "mm",
+    temperature_unit: "celsius",
+    cell_selection: "land"
+  });
+  return `https://api.open-meteo.com${path}?${params}`;
+}
+
+async function loadWeather() {
+  const coords = readCoords();
+  if (!coords) return;
+
+  refreshButton.disabled = true;
+  todayEl.innerHTML = loadingMetricMarkup();
+  forecastEl.innerHTML = "";
+  agriEl.innerHTML = "";
+  familyHighlightEl.innerHTML = "";
+  familyEl.innerHTML = "";
+  providersEl.innerHTML = "";
+  sourcesEl.innerHTML = "";
+  statusEl.innerHTML = `<span class="pill">${iconMarkup("fa-cloud-arrow-down")} ${escapeHtml(t().loading(providers.length))}</span>`;
+
+  const results = await Promise.all(providers.map(provider => fetchProvider(provider, coords)));
+  const usable = results.filter(result => result.ok);
+  const aggregate = buildAggregate(usable);
+  const history = loadForecastHistory(coords);
+  aggregate.days = withForecastConfidence(aggregate.days, history);
+  aggregate.today = aggregate.days.find(day => day.date === budapestDateKey(new Date())) || aggregate.today;
+  lastResults = results;
+  lastAggregate = aggregate;
+  updateMap();
+
+  renderAll(results, aggregate);
+  saveForecastHistory(coords, aggregate.days);
+
+  refreshButton.disabled = false;
+}
+
+function readCoords() {
+  const coords = parseCoords();
+  if (!coords) {
+    statusEl.innerHTML = `<span class="pill bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().invalidCoords)}</span>`;
+    return null;
+  }
+  return coords;
+}
+
+function parseCoords() {
+  const coords = {
+    lat: Number(lat.value.trim().replace(",", ".")),
+    lon: Number(lon.value.trim().replace(",", "."))
+  };
+  if (!Number.isFinite(coords.lat) || !Number.isFinite(coords.lon)) return null;
+  if (coords.lat < COORD_LIMITS.LAT_MIN || coords.lat > COORD_LIMITS.LAT_MAX) return null;
+  if (coords.lon < COORD_LIMITS.LON_MIN || coords.lon > COORD_LIMITS.LON_MAX) return null;
+  return coords;
+}
+
+function forecastHistoryKey(coords) {
+  return `${FORECAST_HISTORY_PREFIX}:${coords.lat.toFixed(4)},${coords.lon.toFixed(4)}`;
+}
+
+function loadForecastHistory(coords) {
+  try {
+    const snapshots = JSON.parse(localStorage.getItem(forecastHistoryKey(coords)) || "[]");
+    return Array.isArray(snapshots) ? snapshots : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveForecastHistory(coords, days) {
+  try {
+    const snapshots = loadForecastHistory(coords);
+    snapshots.unshift({
+      fetchedAt: new Date().toISOString(),
+      days: days.map(({ date, high, low, precip, wind, cloud, sources }) => ({ date, high, low, precip, wind, cloud, sources }))
+    });
+    localStorage.setItem(forecastHistoryKey(coords), JSON.stringify(snapshots.slice(0, MAX_FORECAST_SNAPSHOTS)));
+  } catch {
+    // localStorage may be disabled; confidence falls back to forecast distance.
+  }
+}
+
+async function fetchProvider(provider, coords) {
+  const url = provider.url(coords);
+  const cacheKey = `${provider.id}:${url}`;
+  const cached = providerCache.get(cacheKey);
+  if (cached && Date.now() - cached.cachedAt < PROVIDER_CACHE_TTL_MS) {
+    return cached.result;
+  }
+  providerCache.delete(cacheKey);
+
+  try {
+    const response = await fetch(url, {
+      headers: { "Accept": "application/json" }
+    });
+    const raw = await parseProviderPayload(response);
+    if (!response.ok) {
+      throw new Error(providerErrorMessage(response, raw));
+    }
+    const mapResponse = provider.mapResponse || normaliseOpenMeteo;
+    const result = {
+      ok: true,
+      provider,
+      url,
+      raw,
+      hourly: mapResponse(raw),
+      fetchedAt: new Date().toISOString()
+    };
+    providerCache.set(cacheKey, {
+      cachedAt: Date.now(),
+      result
+    });
+    return result;
+  } catch (error) {
+    return {
+      ok: false,
+      provider,
+      url,
+      error: error.message,
+      fetchedAt: new Date().toISOString()
+    };
+  }
+}
+
+async function parseProviderPayload(response) {
+  const body = await response.text();
+  if (!body) {
+    if (!response.ok) return null;
+    throw new Error("Provider returned an empty response.");
+  }
+  try {
+    return JSON.parse(body);
+  } catch {
+    if (!response.ok) return { error: body.slice(0, 180) };
+    throw new Error("Provider returned invalid JSON.");
+  }
+}
+
+function providerErrorMessage(response, raw) {
+  const message = raw?.reason || raw?.error || response.statusText;
+  return message ? `${response.status} ${message}` : `${response.status}`;
+}
+
+function normaliseOpenMeteo(raw) {
+  const hourly = raw.hourly || {};
+  return (hourly.time || []).map((time, index) => ({
+    key: `${time.slice(0, 13)}:00`,
+    date: time.slice(0, 10),
+    temp: valueAt(hourly.temperature_2m, index),
+    precip: valueAt(hourly.precipitation, index),
+    wind: valueAt(hourly.wind_speed_10m, index),
+    windDirection: valueAt(hourly.wind_direction_10m, index),
+    cloud: valueAt(hourly.cloud_cover, index)
+  }));
+}
+
+function normaliseMetNo(raw) {
+  return (raw.properties?.timeseries || []).map(entry => {
+    const details = entry.data?.instant?.details || {};
+    const nextHour = entry.data?.next_1_hours?.details || {};
+    const key = budapestHourKey(new Date(entry.time));
+    return {
+      key,
+      date: key.slice(0, 10),
+      temp: numberOrNull(details.air_temperature),
+      precip: numberOrNull(nextHour.precipitation_amount),
+      wind: numberOrNull(details.wind_speed) === null ? null : details.wind_speed * 3.6,
+      windDirection: numberOrNull(details.wind_from_direction),
+      cloud: numberOrNull(details.cloud_area_fraction)
+    };
+  });
+}
+
+function buildAggregate(results) {
+  const today = budapestDateKey(new Date());
+  const byProviderDay = results.flatMap(result => dailyForProvider(result, today));
+  const dayKeys = [...new Set(byProviderDay.map(day => day.date))].sort().slice(0, forecastDays);
+  const days = dayKeys.map(date => aggregateDay(date, byProviderDay.filter(day => day.date === date)));
+  return {
+    today: days.find(day => day.date === today) || aggregateDay(today, []),
+    days
+  };
+}
+
+function dailyForProvider(result) {
+  const groups = new Map();
+  result.hourly.forEach(hour => {
+    if (!groups.has(hour.date)) groups.set(hour.date, []);
+    groups.get(hour.date).push(hour);
+  });
+  return [...groups].map(([date, hours]) => ({
+    provider: result.provider.name,
+    date,
+    currentTemp: nearestCurrentTemp(hours),
+    high: max(hours.map(hour => hour.temp)),
+    low: min(hours.map(hour => hour.temp)),
+    precip: sum(hours.map(hour => hour.precip)),
+    wind: max(hours.map(hour => hour.wind)),
+    windDirection: prevailingDirection(hours.map(hour => hour.windDirection)),
+    cloud: median(hours.map(hour => hour.cloud))
+  }));
+}
+
+function aggregateDay(date, providerDays) {
+  return {
+    date,
+    sources: providerDays.length,
+    currentTemp: median(providerDays.map(day => day.currentTemp)),
+    high: median(providerDays.map(day => day.high)),
+    low: median(providerDays.map(day => day.low)),
+    precip: median(providerDays.map(day => day.precip)),
+    wind: median(providerDays.map(day => day.wind)),
+    windDirection: prevailingDirection(providerDays.map(day => day.windDirection)),
+    cloud: median(providerDays.map(day => day.cloud))
+  };
+}
+
+function withForecastConfidence(days, history) {
+  const previousDays = history.flatMap(snapshot => Array.isArray(snapshot.days) ? snapshot.days : []);
+  return days.map((day, index) => {
+    const previous = previousDays.find(candidate => candidate.date === day.date);
+    const base = index < 2 ? 96 - index * 3 : Math.max(58, 92 - index * 10);
+    const penalty = previous ? forecastChangePenalty(day, previous) : 0;
+    const score = Math.max(35, Math.round(base - penalty));
+    return { ...day, confidence: score };
+  });
+}
+
+function forecastChangePenalty(day, previous) {
+  return Math.min(28, [
+    normalisedDelta(day.high, previous.high, 6),
+    normalisedDelta(day.low, previous.low, 6),
+    normalisedDelta(day.precip, previous.precip, 10),
+    normalisedDelta(day.wind, previous.wind, 30),
+    normalisedDelta(day.cloud, previous.cloud, 60)
+  ].reduce((total, value) => total + value, 0) * 12);
+}
+
+function normalisedDelta(current, previous, range) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return 0;
+  return Math.min(1, Math.abs(current - previous) / range);
+}
+
+function hourlyAggregate(results, limit = 48) {
+  const currentKey = budapestHourKey(new Date());
+  const byHour = new Map();
+  results.forEach(result => {
+    result.hourly.forEach(hour => {
+      if (hour.key < currentKey) return;
+      if (!byHour.has(hour.key)) byHour.set(hour.key, []);
+      byHour.get(hour.key).push(hour);
+    });
+  });
+  return [...byHour]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .slice(0, limit)
+    .map(([key, hours]) => ({
+      key,
+      date: key.slice(0, 10),
+      sources: hours.length,
+      temp: median(hours.map(hour => hour.temp)),
+      precip: median(hours.map(hour => hour.precip)),
+      wind: median(hours.map(hour => hour.wind)),
+      windDirection: prevailingDirection(hours.map(hour => hour.windDirection)),
+      cloud: median(hours.map(hour => hour.cloud))
+    }));
+}
+
+function workWindows(hours, size = 6) {
+  const windows = [];
+  for (let start = 0; start < hours.length; start += size) {
+    const slice = hours.slice(start, start + size);
+    if (slice.length < size) break;
+    const summary = {
+      date: slice[0].date,
+      sources: max(slice.map(hour => hour.sources)),
+      currentTemp: slice[0].temp,
+      high: max(slice.map(hour => hour.temp)),
+      low: min(slice.map(hour => hour.temp)),
+      precip: sum(slice.map(hour => hour.precip)),
+      wind: max(slice.map(hour => hour.wind)),
+      windDirection: prevailingDirection(slice.map(hour => hour.windDirection)),
+      cloud: median(slice.map(hour => hour.cloud))
+    };
+    windows.push({
+      start,
+      end: start + slice.length - 1,
+      startKey: slice[0].key,
+      endKey: slice[slice.length - 1].key,
+      summary,
+      evaluation: evaluateAgriculture(summary, crop.value, work.value, windows.map(window => window.summary))
+    });
+  }
+  return windows;
+}
+
+function nearestCurrentTemp(hours) {
+  const currentKey = budapestHourKey(new Date());
+  const exact = hours.find(hour => hour.key === currentKey);
+  if (exact) return exact.temp;
+  return hours.find(hour => hour.key > currentKey)?.temp ?? null;
+}
+
+function renderStatus(results) {
+  statusEl.innerHTML = results.map(result => {
+    const cls = result.ok ? "ok" : "bad";
+    const text = result.ok ? `${result.provider.name}: ${result.hourly.length} hours` : `${result.provider.name}: ${result.error}`;
+    const icon = result.ok ? "fa-circle-check" : "fa-triangle-exclamation";
+    return `<span class="pill ${cls}">${iconMarkup(icon)} ${escapeHtml(text)}</span>`;
+  }).join("");
+}
+
+function renderToday(day, sourceCount) {
+  const strings = t();
+  todayEl.innerHTML = [
+    metricMarkup("fa-temperature-half", strings.now, formatTemp(day.currentTemp), strings.activeSources(sourceCount)),
+    metricMarkup("fa-arrows-up-down", strings.highLow, `${formatTemp(day.high)} / ${formatTemp(day.low)}`, strings.dailyRange),
+    metricMarkup("fa-cloud-rain", strings.precipitation, formatMm(day.precip), strings.dailyTotal),
+    metricMarkup("fa-wind", strings.wind, formatKmh(day.wind), `${strings.dailyMax} · ${formatWindDirection(day.windDirection)}`)
+  ].join("");
+}
+
+function renderForecast(days) {
+  const strings = t();
+  forecastEl.innerHTML = days.map(day => `
+    <article class="day" style="--confidence-color: ${forecastConfidenceColor(day.confidence)}">
+      <time datetime="${day.date}">${formatDate(day.date)}</time>
+      <strong>${formatTemp(day.high)} / ${formatTemp(day.low)}</strong>
+      <dl>
+        <dt>${iconMarkup("fa-gauge-high")} ${strings.confidence}</dt><dd>${formatConfidence(day.confidence)}</dd>
+        <dt>${iconMarkup("fa-cloud-rain")} ${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
+        <dt>${iconMarkup("fa-wind")} ${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
+        <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
+        <dt>${strings.cloud}</dt><dd>${formatPercent(day.cloud)}</dd>
+        <dt>${strings.sourceCount}</dt><dd>${day.sources}</dd>
+      </dl>
+    </article>
+  `).join("");
+}
+
+function renderHourlyWork(results) {
+  const strings = t();
+  const hours = hourlyAggregate(results);
+  const windows = workWindows(hours);
+  renderWorkWindowCards(windows);
+
+  if (typeof Chart === "undefined") {
+    workWindowsEl.innerHTML += noteMarkup(strings.chartUnavailable);
+    return;
+  }
+
+  if (hourlyChart) hourlyChart.destroy();
+  hourlyChart = new Chart(hourlyChartCanvas, {
+    type: "bar",
+    data: {
+      labels: hours.map(hour => formatHour(hour.key)),
+      datasets: [
+        {
+          type: "line",
+          label: strings.tempChart,
+          data: hours.map(hour => hour.temp),
+          yAxisID: "temp",
+          borderColor: "#b42318",
+          backgroundColor: "#b42318",
+          pointRadius: 0,
+          tension: 0.25
+        },
+        {
+          label: strings.rainChart,
+          data: hours.map(hour => hour.precip),
+          yAxisID: "rain",
+          backgroundColor: "rgba(15, 118, 110, 0.32)",
+          borderColor: "#0f766e",
+          borderWidth: 1
+        },
+        {
+          type: "line",
+          label: strings.windChart,
+          data: hours.map(hour => hour.wind),
+          yAxisID: "wind",
+          borderColor: "#334e68",
+          backgroundColor: "#334e68",
+          pointRadius: 0,
+          tension: 0.2
+        }
+      ]
+    },
+    options: hourlyChartOptions(strings, windows, hours),
+    plugins: [workWindowBands]
+  });
+}
+
+function renderWorkWindowCards(windows) {
+  const strings = t();
+  workWindowsEl.innerHTML = windows.map(window => `
+    <article class="window-card ${window.evaluation.level}">
+      <strong>${formatWindowRange(window.startKey, window.endKey)}</strong>
+      <span>${scoreIconMarkup(window.evaluation.level)} ${strings[window.evaluation.level]} · ${formatMm(window.summary.precip)} · ${formatKmh(window.summary.wind)}</span>
+    </article>
+  `).join("");
+}
+
+function hourlyChartOptions(strings, windows, hours) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: {
+      mode: "index",
+      intersect: false
+    },
+    plugins: {
+      legend: {
+        position: "top"
+      },
+      tooltip: {
+        callbacks: {
+          afterBody(items) {
+            const window = windows.find(candidate => items[0].dataIndex >= candidate.start && items[0].dataIndex <= candidate.end);
+            const hour = hours[items[0].dataIndex];
+            return [
+              `${strings.rulingWindDirection}: ${formatWindDirection(hour?.windDirection)}`,
+              window ? `${strings.workWindow}: ${strings[window.evaluation.level]}` : ""
+            ].filter(Boolean);
+          }
+        }
+      },
+      workWindowBands: {
+        windows
+      }
+    },
+    scales: {
+      x: {
+        grid: {
+          display: false
+        },
+        ticks: {
+          maxRotation: 0,
+          autoSkipPadding: 18
+        }
+      },
+      temp: {
+        type: "linear",
+        position: "left",
+        title: {
+          display: true,
+          text: "°C"
+        }
+      },
+      rain: {
+        type: "linear",
+        position: "right",
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: "mm"
+        },
+        grid: {
+          drawOnChartArea: false
+        }
+      },
+      wind: {
+        type: "linear",
+        position: "right",
+        beginAtZero: true,
+        display: false,
+        grid: {
+          drawOnChartArea: false
+        }
+      }
+    }
+  };
+}
+
+const workWindowBands = {
+  id: "workWindowBands",
+  beforeDatasetsDraw(chart, args, options) {
+    const windows = options.windows || [];
+    const { ctx, chartArea, scales } = chart;
+    if (!chartArea || !scales.x) return;
+    ctx.save();
+    windows.forEach(window => {
+      const start = windowBoundary(scales.x, window.start, -0.5);
+      const end = windowBoundary(scales.x, window.end, 0.5);
+      ctx.fillStyle = windowBandColor(window.evaluation.level);
+      ctx.fillRect(start, chartArea.top, end - start, chartArea.bottom - chartArea.top);
+    });
+    ctx.restore();
+  }
+};
+
+function windowBoundary(scale, index, offset) {
+  const here = scale.getPixelForValue(index);
+  const other = scale.getPixelForValue(index + (offset < 0 ? 1 : -1));
+  const width = Math.abs(here - other) || 12;
+  return here + width * offset;
+}
+
+function windowBandColor(level) {
+  if (level === SCORE.GOOD) return "rgba(19, 115, 51, 0.08)";
+  if (level === SCORE.CAUTION) return "rgba(161, 92, 0, 0.10)";
+  return "rgba(180, 35, 24, 0.08)";
+}
+
+function renderAgriculture(days) {
+  const strings = t();
+  agriEl.innerHTML = days.map((day, index) => {
+    const evaluation = evaluateAgriculture(day, crop.value, work.value, days.slice(0, index));
+    return `
+      <article class="agri-card">
+        <time datetime="${day.date}">${formatDate(day.date)}</time>
+        <h3>${strings[crop.value]} - ${strings[work.value]}</h3>
+        <span class="score ${evaluation.level}">${scoreIconMarkup(evaluation.level)} ${strings[evaluation.level]}</span>
+        <dl>
+          <dt>${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
+          <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
+        </dl>
+        <ul class="reasons">
+          ${evaluation.reasons.map(reason => `<li>${escapeHtml(strings.reasons[reason])}</li>`).join("")}
+        </ul>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderFamily(days) {
+  const strings = t();
+  renderFamilyHighlight(days);
+  familyEl.innerHTML = days.map(day => {
+    const advice = evaluateFamily(day);
+    return `
+      <article class="family-card">
+        <time datetime="${day.date}">${formatDate(day.date)}</time>
+        <h3>${strings.dress}</h3>
+        <span class="score ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
+        <ul class="reasons">
+          ${advice.dress.map(reason => `<li>${escapeHtml(strings.familyReasons[reason])}</li>`).join("")}
+        </ul>
+        <h3>${strings.health}</h3>
+        <ul class="reasons">
+          ${advice.health.map(reason => `<li>${escapeHtml(strings.familyReasons[reason])}</li>`).join("")}
+        </ul>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderFamilyHighlight(days) {
+  const strings = t();
+  const tomorrow = days.find(day => day.date === tomorrowDateKey()) || days.find(day => day.date > budapestDateKey(new Date())) || days[1];
+  if (!tomorrow) {
+    familyHighlightEl.innerHTML = noteMarkup(strings.noData);
+    return;
+  }
+
+  const advice = evaluateFamily(tomorrow);
+  const dress = advice.dress.map(reason => strings.familyReasons[reason]).join(", ");
+  const health = advice.health.map(reason => strings.familyReasons[reason]).join(", ");
+  familyHighlightEl.innerHTML = `
+    <div class="family-highlight-head">
+      <div>
+        <time datetime="${tomorrow.date}">${formatDate(tomorrow.date)}</time>
+        <h3>${escapeHtml(strings.tomorrowFamily)}</h3>
+      </div>
+      <button id="familyReminder" type="button">${iconMarkup("fa-bell")} ${escapeHtml(strings.remindAtSeven)}</button>
+    </div>
+    <span class="score ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
+    <p>${escapeHtml(strings.tomorrowSummary(strings[advice.level], dress, health))}</p>
+  `;
+}
+
+async function enableFamilyReminder() {
+  const strings = t();
+  const button = document.querySelector("#familyReminder");
+  if (!("Notification" in window)) {
+    if (button) button.innerHTML = `${iconMarkup("fa-bell-slash")} ${escapeHtml(strings.reminderUnavailable)}`;
+    return;
+  }
+
+  const permission = Notification.permission === "granted"
+    ? "granted"
+    : await Notification.requestPermission();
+  if (permission !== "granted") {
+    if (button) button.innerHTML = `${iconMarkup("fa-bell-slash")} ${escapeHtml(strings.reminderDenied)}`;
+    return;
+  }
+
+  scheduleFamilyReminder();
+  if (button) button.innerHTML = `${iconMarkup("fa-bell")} ${escapeHtml(strings.reminderEnabled)}`;
+}
+
+function scheduleFamilyReminder() {
+  clearTimeout(familyReminderTimer);
+  familyReminderTimer = setTimeout(() => {
+    new Notification(t().reminderTitle, { body: familyReminderMessage() });
+    scheduleFamilyReminder();
+  }, msUntilNextReminder());
+}
+
+function familyReminderMessage() {
+  const strings = t();
+  const tomorrow = lastAggregate?.days.find(day => day.date === tomorrowDateKey());
+  if (!tomorrow) return strings.noData;
+  const advice = evaluateFamily(tomorrow);
+  const dress = advice.dress.map(reason => strings.familyReasons[reason]).join(", ");
+  const health = advice.health.map(reason => strings.familyReasons[reason]).join(", ");
+  return strings.tomorrowSummary(strings[advice.level], dress, health);
+}
+
+function evaluateFamily(day) {
+  if (!day.sources) {
+    return { level: SCORE.POOR, dress: ["noData"], health: ["noData"] };
+  }
+
+  const dress = [];
+  const health = [];
+  let score = 0;
+  const high = day.high ?? 0;
+  const low = day.low ?? 99;
+  const rain = day.precip ?? 0;
+  const wind = day.wind ?? 0;
+  const cloud = day.cloud ?? 100;
+
+  if (high >= 28) addDress("lightClothes");
+  else if (low <= 0) addDress("coat");
+  else if (low <= 12) addDress("warmLayer");
+  else addDress("comfortable");
+
+  if (rain >= 1) addDress("rainGear");
+  if (wind >= 22) addDress("windLayer");
+  if (high >= 24 && cloud <= 45) addDress("sunProtection");
+
+  if (high >= 34) addHealth("heatReduceActivity", 3);
+  else if (high >= 30) addHealth("heatHydration", 2);
+  if (high >= 30) addHealth("checkVulnerable", 1);
+  if (low <= 0) addHealth("coldExposure", 2);
+  if (low <= 8 && rain >= 1) addHealth("wetCold", 1);
+  if (wind >= 35) addHealth("strongWind", 2);
+  if (rain >= 8) addHealth("heavyRain", 2);
+
+  if (!health.length) addHealth("comfortable", 0);
+
+  return {
+    level: score >= 4 ? SCORE.POOR : score >= 2 ? SCORE.CAUTION : SCORE.GOOD,
+    dress,
+    health
+  };
+
+  function addDress(reason) {
+    if (!dress.includes(reason)) dress.push(reason);
+  }
+
+  function addHealth(reason, points) {
+    if (!health.includes(reason)) health.push(reason);
+    score += points;
+  }
+}
+
+function evaluateAgriculture(day, cropKey, workKey, previousDays = []) {
+  if (!day.sources) {
+    return { level: SCORE.POOR, reasons: ["noData"] };
+  }
+
+  const reasons = [];
+  let score = 0;
+  const rain = day.precip ?? 0;
+  const wind = day.wind ?? 0;
+  const high = day.high ?? 0;
+  const low = day.low ?? 99;
+  const cloud = day.cloud ?? 0;
+  const wetness = carryOverWetness(previousDays, day);
+
+  if (workKey === WORK.SEEDING) {
+    if (rain >= AGRI_LIMITS.SEEDING_RAIN_POOR_MM) addReason("rainPoor", 3);
+    else if (rain >= AGRI_LIMITS.SEEDING_RAIN_CAUTION_MM) addReason("rainCaution", 1);
+    else if (rain <= AGRI_LIMITS.DRY_SEEDBED_RAIN_MM && high >= AGRI_LIMITS.DRY_SEEDBED_HIGH_C) addReason("drySeedbed", 1);
+
+    if ([CROP.CORN, CROP.SUNFLOWER].includes(cropKey) && low < AGRI_LIMITS.COLD_SENSITIVE_LOW_C) addReason("coldSensitive", 2);
+    if (cropKey === CROP.RAPESEED && high >= AGRI_LIMITS.RAPESEED_HEAT_C && rain <= AGRI_LIMITS.RAPESEED_HEAT_RAIN_MM) addReason("rapeseedHeat", 2);
+  } else if (workKey === WORK.HARVESTING) {
+    if (rain >= AGRI_LIMITS.HARVEST_RAIN_POOR_MM) addReason("wetHarvest", 3);
+    else if (rain >= AGRI_LIMITS.HARVEST_RAIN_CAUTION_MM) addReason("rainCaution", 2);
+    if (cloud >= AGRI_LIMITS.DRYING_WEAK_CLOUD_PERCENT) addReason("dryingWeak", 1);
+    if ([CROP.RAPESEED, CROP.WHEAT, CROP.BARLEY].includes(cropKey) && rain >= AGRI_LIMITS.HARVEST_RAIN_CAUTION_MM) addReason("cerealHarvest", 1);
+  } else if (workKey === WORK.SPRAYING) {
+    if (rain >= AGRI_LIMITS.SPRAY_RAIN_POOR_MM) addReason("sprayRain", 3);
+    else if (rain >= AGRI_LIMITS.SPRAY_RAIN_CAUTION_MM) addReason("sprayRain", 1);
+    if (wind >= AGRI_LIMITS.SPRAY_WIND_POOR_KMH) addReason("sprayDrift", 3);
+    else if (wind >= AGRI_LIMITS.SPRAY_WIND_CAUTION_KMH) addReason("sprayDrift", 1);
+    if (high >= AGRI_LIMITS.SPRAY_HEAT_POOR_C) addReason("sprayHeat", 3);
+    else if (high >= AGRI_LIMITS.SPRAY_HEAT_CAUTION_C) addReason("sprayHeat", 1);
+  }
+
+  if (workKey !== WORK.SPRAYING) {
+    if (wind >= AGRI_LIMITS.WIND_POOR_KMH) addReason("windPoor", 3);
+    else if (wind >= AGRI_LIMITS.WIND_CAUTION_KMH) addReason("windCaution", 1);
+    if (high >= AGRI_LIMITS.HEAT_STRESS_C) addReason("heatStress", 1);
+  }
+  if (wetness >= AGRI_LIMITS.SATURATED_WETNESS) addReason("saturatedLand", 3);
+  else if (wetness >= AGRI_LIMITS.PARTIAL_DRYING_WETNESS) addReason("partialDrying", 1);
+
+  if (!reasons.length) {
+    return { level: SCORE.GOOD, reasons: ["workable"] };
+  }
+  return {
+    level: score >= 4 ? SCORE.POOR : SCORE.CAUTION,
+    reasons
+  };
+
+  function addReason(reason, points) {
+    if (!reasons.includes(reason)) reasons.push(reason);
+    score += points;
+  }
+}
+
+function carryOverWetness(previousDays, day) {
+  const recent = previousDays.slice(-2);
+  const wetness = recent.reduce((total, previousDay, index) => {
+    const ageWeight = index === recent.length - 1 ? 1 : 0.45;
+    const rain = previousDay.precip ?? 0;
+    if (rain >= 15) return total + 5 * ageWeight;
+    if (rain >= 8) return total + 3 * ageWeight;
+    if (rain >= 3) return total + 1.5 * ageWeight;
+    return total;
+  }, 0);
+  return Math.max(0, wetness - dryingCredit(day));
+}
+
+function dryingCredit(day) {
+  let credit = 0;
+  if ((day.precip ?? 0) <= 0.5) credit += 1;
+  if ((day.high ?? 0) >= 22) credit += 1;
+  if ((day.wind ?? 0) >= 10 && (day.wind ?? 0) <= 28) credit += 0.75;
+  if ((day.cloud ?? 100) <= 45) credit += 0.75;
+  return credit;
+}
+
+function renderProviders(results) {
+  const strings = t();
+  providersEl.innerHTML = results.map(result => {
+    if (!result.ok) {
+      return `
+        <article class="provider">
+          <h3>${iconMarkup("fa-satellite-dish")} ${escapeHtml(result.provider.name)}</h3>
+          <p class="error">${escapeHtml(result.error)}</p>
+        </article>
+      `;
+    }
+    const today = dailyForProvider(result).find(day => day.date === budapestDateKey(new Date()));
+    return `
+      <article class="provider">
+        <h3>${iconMarkup("fa-satellite-dish")} ${escapeHtml(result.provider.name)}</h3>
+        <dl>
+          <dt>${strings.now}</dt><dd>${formatTemp(today?.currentTemp)}</dd>
+          <dt>${strings.high}</dt><dd>${formatTemp(today?.high)}</dd>
+          <dt>${strings.low}</dt><dd>${formatTemp(today?.low)}</dd>
+          <dt>${strings.rain}</dt><dd>${formatMm(today?.precip)}</dd>
+          <dt>${strings.wind}</dt><dd>${formatKmh(today?.wind)}</dd>
+          <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(today?.windDirection)}</dd>
+        </dl>
+      </article>
+    `;
+  }).join("");
+}
+
+function renderSources(results) {
+  sourcesEl.innerHTML = results.map(result => {
+    const payload = result.ok ? result.raw : { error: result.error };
+    return `
+      <details>
+        <summary>${iconMarkup("fa-file-code")} ${escapeHtml(result.provider.name)} ${escapeHtml(t().rawData)}</summary>
+        <pre>${escapeHtml(JSON.stringify({
+          url: result.url,
+          fetchedAt: result.fetchedAt,
+          payload
+        }, null, 2))}</pre>
+      </details>
+    `;
+  }).join("");
+}
+
+function loadingMetricMarkup() {
+  const strings = t();
+  return [
+    metricMarkup("fa-temperature-half", strings.now, "...", strings.loading(providers.length)),
+    metricMarkup("fa-arrows-up-down", strings.highLow, "...", strings.loading(providers.length)),
+    metricMarkup("fa-cloud-rain", strings.precipitation, "...", strings.loading(providers.length)),
+    metricMarkup("fa-wind", strings.wind, "...", strings.loading(providers.length))
+  ].join("");
+}
+
+function metricMarkup(icon, label, value, help) {
+  return `
+    <article class="metric">
+      <span>${iconMarkup(icon)} ${label}</span>
+      <strong>${value}</strong>
+      <small>${help}</small>
+    </article>
+  `;
+}
+
+function median(values) {
+  const clean = values.filter(value => Number.isFinite(value)).sort((a, b) => a - b);
+  if (!clean.length) return null;
+  const middle = Math.floor(clean.length / 2);
+  return clean.length % 2 ? clean[middle] : (clean[middle - 1] + clean[middle]) / 2;
+}
+
+function max(values) {
+  const clean = values.filter(value => Number.isFinite(value));
+  return clean.length ? Math.max(...clean) : null;
+}
+
+function min(values) {
+  const clean = values.filter(value => Number.isFinite(value));
+  return clean.length ? Math.min(...clean) : null;
+}
+
+function sum(values) {
+  const clean = values.filter(value => Number.isFinite(value));
+  return clean.length ? clean.reduce((total, value) => total + value, 0) : null;
+}
+
+function prevailingDirection(values) {
+  const clean = values.filter(value => Number.isFinite(value));
+  if (!clean.length) return null;
+  const sectors = Array(8).fill(0);
+  clean.forEach(value => {
+    const index = Math.round((((value % 360) + 360) % 360) / 45) % 8;
+    sectors[index] += 1;
+  });
+  const winningIndex = sectors.indexOf(Math.max(...sectors));
+  return winningIndex * 45;
+}
+
+function valueAt(values, index) {
+  return numberOrNull(Array.isArray(values) ? values[index] : null);
+}
+
+function numberOrNull(value) {
+  return Number.isFinite(value) ? value : null;
+}
+
+function budapestDateKey(date) {
+  return partsFor(date).slice(0, 3).join("-");
+}
+
+function tomorrowDateKey() {
+  return budapestDateKey(new Date(Date.now() + 24 * 60 * 60 * 1000));
+}
+
+function msUntilNextReminder() {
+  const next = new Date();
+  next.setHours(19, 0, 0, 0);
+  if (next <= new Date()) next.setDate(next.getDate() + 1);
+  return next - new Date();
+}
+
+function budapestHourKey(date) {
+  const [year, month, day, hour] = partsFor(date);
+  return `${year}-${month}-${day}T${hour}:00`;
+}
+
+function partsFor(date) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: zone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    hour12: false
+  }).formatToParts(date);
+  const pick = type => parts.find(part => part.type === type).value;
+  return [pick("year"), pick("month"), pick("day"), pick("hour")];
+}
+
+function formatDate(date) {
+  const parsed = new Date(`${date}T12:00:00`);
+  return new Intl.DateTimeFormat(language.value === LOCALE.HU_HU ? LOCALE.HU_HU : LOCALE.EN_GB, {
+    weekday: "short",
+    day: "2-digit",
+    month: "short"
+  }).format(parsed);
+}
+
+function formatHour(key) {
+  return new Intl.DateTimeFormat(language.value === LOCALE.HU_HU ? LOCALE.HU_HU : LOCALE.EN_GB, {
+    weekday: "short",
+    hour: "2-digit"
+  }).format(new Date(key));
+}
+
+function formatWindowRange(startKey, endKey) {
+  const locale = language.value === LOCALE.HU_HU ? LOCALE.HU_HU : LOCALE.EN_GB;
+  const format = new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    hour: "2-digit"
+  });
+  return `${format.format(new Date(startKey))} - ${format.format(new Date(endKey))}`;
+}
+
+function formatWindDirection(value) {
+  if (!Number.isFinite(value)) return "n/a";
+  const labels = language.value === LOCALE.HU_HU
+    ? ["É", "ÉK", "K", "DK", "D", "DNY", "NY", "ÉNY"]
+    : ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const index = Math.round((((value % 360) + 360) % 360) / 45) % 8;
+  return labels[index];
+}
+
+function formatTemp(value) {
+  return Number.isFinite(value) ? `${Math.round(value)}°C` : "n/a";
+}
+
+function formatMm(value) {
+  return Number.isFinite(value) ? `${value.toFixed(1)} mm` : "n/a";
+}
+
+function formatKmh(value) {
+  return Number.isFinite(value) ? `${Math.round(value)} km/h` : "n/a";
+}
+
+function formatPercent(value) {
+  return Number.isFinite(value) ? `${Math.round(value)}%` : "n/a";
+}
+
+function formatConfidence(value) {
+  return Number.isFinite(value) ? `${Math.round(value)}%` : "n/a";
+}
+
+function forecastConfidenceColor(value) {
+  if (!Number.isFinite(value)) return "161, 92, 0";
+  const score = Math.max(0, Math.min(100, value));
+  if (score >= 70) return "19, 115, 51";
+  if (score >= 50) return "161, 92, 0";
+  return "180, 35, 24";
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function noteMarkup(message) {
+  return `<p class="note">${escapeHtml(message)}</p>`;
+}
+
+function iconMarkup(icon) {
+  return `<i class="fa-solid ${icon}" aria-hidden="true"></i>`;
+}
+
+function scoreIconMarkup(level) {
+  if (level === SCORE.GOOD) return iconMarkup("fa-circle-check");
+  if (level === SCORE.CAUTION) return iconMarkup("fa-triangle-exclamation");
+  return iconMarkup("fa-circle-xmark");
+}

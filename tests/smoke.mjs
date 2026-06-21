@@ -30,8 +30,7 @@ class Element {
 }
 
 const html = fs.readFileSync("index.html", "utf8");
-const script = html.match(/<script>([\s\S]*)<\/script>/)?.[1];
-assert.ok(script, "script tag not found");
+const script = fs.readFileSync("app.js", "utf8");
 
 const ids = [...html.matchAll(/id="([^"]+)"/g)].map(match => match[1]);
 const elements = Object.fromEntries(ids.map(id => [id, new Element(id)]));
