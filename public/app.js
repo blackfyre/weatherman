@@ -1751,11 +1751,22 @@ function formatHour(key) {
 
 function formatWindowRange(startKey, endKey) {
   const locale = language.value === LOCALE.HU_HU ? LOCALE.HU_HU : LOCALE.EN_GB;
-  const format = new Intl.DateTimeFormat(locale, {
+  const dateFormat = new Intl.DateTimeFormat(locale, {
     weekday: "short",
+    day: "2-digit",
+    month: "short"
+  });
+  const timeFormat = new Intl.DateTimeFormat(locale, {
     hour: "2-digit"
   });
-  return `${format.format(new Date(startKey))} - ${format.format(new Date(endKey))}`;
+  const start = new Date(startKey);
+  const end = new Date(endKey);
+  const startDate = dateFormat.format(start);
+  const endDate = dateFormat.format(end);
+  const startTime = timeFormat.format(start);
+  const endTime = timeFormat.format(end);
+  if (startDate === endDate) return `${startDate}, ${startTime}-${endTime}`;
+  return `${startDate}, ${startTime} - ${endDate}, ${endTime}`;
 }
 
 function formatWindDirection(value) {
