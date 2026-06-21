@@ -15,7 +15,7 @@ run = "node tests/smoke.mjs"
 
 [tasks.serve]
 description = "Serve the static site locally"
-run = "python3 -m http.server 8000"
+run = "python3 -m http.server 8000 -d src"
 
 [tasks.tmux]
 description = "Start the Codex tmux workspace"
