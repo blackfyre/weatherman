@@ -351,10 +351,15 @@ section {
 }
 
 .reasons {
+  list-style: disc;
   margin: 10px 0 0;
   padding-left: 18px;
   color: var(--muted);
   font-size: 13px;
+}
+
+.reasons li + li {
+  margin-top: 4px;
 }
 
 .card-note {
