@@ -31,6 +31,12 @@ const SUPPORTED_LOCALES = Object.freeze([LOCALE.EN_GB, LOCALE.HU_HU]);
 const SUPPORTED_CROPS = Object.freeze(Object.values(CROP));
 const SUPPORTED_WORK = Object.freeze(Object.values(WORK));
 const SUPPORTED_ADVISORY_DOMAINS = Object.freeze(Object.values(ADVISORY_DOMAIN));
+const SUPPORTED_THEMES = Object.freeze([
+  "light", "dark", "cupcake", "bumblebee", "emerald", "corporate", "synthwave", "retro", "cyberpunk",
+  "valentine", "halloween", "garden", "forest", "aqua", "lofi", "pastel", "fantasy", "wireframe",
+  "black", "luxury", "dracula", "cmyk", "autumn", "business", "acid", "lemonade", "night", "coffee",
+  "winter", "dim", "nord", "sunset", "caramellatte", "abyss", "silk"
+]);
 const COORD_LIMITS = Object.freeze({
   LAT_MIN: -90,
   LAT_MAX: 90,
@@ -133,6 +139,7 @@ const place = document.querySelector("#place");
 const lat = document.querySelector("#lat");
 const lon = document.querySelector("#lon");
 const language = document.querySelector("#language");
+const theme = document.querySelector("#theme");
 const crop = document.querySelector("#crop");
 const work = document.querySelector("#work");
 const agriTab = document.querySelector("#agriTab");
@@ -152,6 +159,7 @@ const text = {
     lat: "Latitude",
     lon: "Longitude",
     language: "Language",
+    theme: "Theme",
     crop: "Crop",
     work: "Work",
     refresh: "Refresh",
@@ -302,6 +310,7 @@ const text = {
     lat: "Szélesség",
     lon: "Hosszúság",
     language: "Nyelv",
+    theme: "Téma",
     crop: "Kultúra",
     work: "Munka",
     refresh: "Frissítés",
@@ -468,17 +477,20 @@ familyHighlightEl.addEventListener("click", event => {
   if (event.target.id === "familyReminder") enableFamilyReminder();
 });
 
-[language, crop, work].forEach(control => {
+[language, theme, crop, work].forEach(control => {
   control.addEventListener("change", () => {
     applyStaticText();
+    applyTheme();
     updateMap();
     saveSettings();
     rerenderCachedWeather();
   });
 });
 
+updateThemeOptions();
 if (!loadSettings()) applyBrowserLocale();
 applyStaticText();
+applyTheme();
 registerServiceWorker();
 loadWeather();
 
@@ -534,6 +546,7 @@ function loadSettings() {
     if (Number.isFinite(settings.lat)) lat.value = String(settings.lat);
     if (Number.isFinite(settings.lon)) lon.value = String(settings.lon);
     if (selectHasValue(language, settings.language)) language.value = settings.language;
+    if (selectHasValue(theme, settings.theme)) theme.value = settings.theme;
     if (selectHasValue(crop, settings.crop)) crop.value = settings.crop;
     if (selectHasValue(work, settings.work)) work.value = settings.work;
     if (SUPPORTED_ADVISORY_DOMAINS.includes(settings.advisoryDomain)) setActiveDomain(settings.advisoryDomain);
@@ -552,6 +565,7 @@ function saveSettings() {
       lat: coords.lat,
       lon: coords.lon,
       language: language.value,
+      theme: theme.value,
       crop: crop.value,
       work: work.value,
       advisoryDomain: currentAdvisoryDomain()
@@ -576,6 +590,7 @@ function applyStaticText() {
   document.querySelector("#latLabel").textContent = strings.lat;
   document.querySelector("#lonLabel").textContent = strings.lon;
   document.querySelector("#languageLabel").textContent = strings.language;
+  document.querySelector("#themeLabel").textContent = strings.theme;
   document.querySelector("#cropLabel").textContent = strings.crop;
   document.querySelector("#workLabel").textContent = strings.work;
   refreshButton.innerHTML = `${iconMarkup("fa-rotate-right")} ${escapeHtml(strings.refresh)}`;
@@ -596,11 +611,29 @@ function applyStaticText() {
   document.querySelector("#medianNote").textContent = strings.medianNote;
   document.querySelector("#agriNote").textContent = strings.agriNote;
   document.querySelector("#familyNote").textContent = strings.familyNote;
+  updateThemeOptions();
   updateOptionLabels(crop, SUPPORTED_CROPS);
   updateOptionLabels(work, SUPPORTED_WORK);
   sortSelectOptions(language, locale);
+  sortSelectOptions(theme, locale);
   sortSelectOptions(crop, locale);
   sortSelectOptions(work, locale);
+}
+
+function updateThemeOptions() {
+  const selected = theme.value || "emerald";
+  theme.innerHTML = SUPPORTED_THEMES
+    .map(name => `<option value="${name}">${themeLabel(name)}</option>`)
+    .join("");
+  theme.value = SUPPORTED_THEMES.includes(selected) ? selected : "emerald";
+}
+
+function themeLabel(name) {
+  return name.replaceAll("-", " ").replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+function applyTheme() {
+  document.documentElement.dataset.theme = SUPPORTED_THEMES.includes(theme.value) ? theme.value : "emerald";
 }
 
 function updateOptionLabels(select, values) {

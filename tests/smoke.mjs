@@ -49,7 +49,7 @@ elements.lat.value = "47.58";
 elements.lon.value = "18.88";
 
 const document = {
-  documentElement: new Element("html"),
+  documentElement: Object.assign(new Element("html"), { dataset: {} }),
   title: "",
   querySelector(selector) {
     return elements[selector.replace("#", "")] || null;
