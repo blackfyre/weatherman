@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="emerald">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,21 +9,24 @@
   <meta name="apple-mobile-web-app-title" content="Weather Median">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5" rel="stylesheet" type="text/css">
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@5/themes.css" rel="stylesheet" type="text/css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.0.0/css/all.min.css">
   <title>Hungary Weather Median</title>
   <link rel="stylesheet" href="app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
 </head>
-<body>
-  <main>
-    <header>
+<body class="bg-base-200 text-base-content">
+  <main class="mx-auto px-0 py-7 max-[760px]:py-5">
+    <header class="mb-5 grid grid-cols-[1fr_auto] items-end gap-5 max-[760px]:grid-cols-1">
       <div>
-        <h1 id="title">Hungary Weather Median</h1>
-        <p class="subtle" id="subtitle">Median forecast from Europe/Hungary-relevant public sources. Raw responses stay available below.</p>
+        <h1 class="text-3xl font-bold leading-tight" id="title">Hungary Weather Median</h1>
+        <p class="subtle mt-2 text-sm" id="subtitle">Median forecast from Europe/Hungary-relevant public sources. Raw responses stay available below.</p>
       </div>
       <form class="toolbar" id="controls">
-        <label>
-          <span id="placeLabel">Place</span>
-          <select id="place">
+        <label class="form-field">
+          <span class="label-text" id="placeLabel">Place</span>
+          <select class="select select-bordered select-sm" id="place">
             <option value="47.58,18.88,Nagykovacsi">Nagykovacsi</option>
             <option value="47.416667,16.85,Simasag">Simasag</option>
             <option value="47.4979,19.0402,Budapest">Budapest</option>
@@ -34,64 +37,64 @@
             <option value="custom">Custom</option>
           </select>
         </label>
-        <label>
-          <span id="latLabel">Latitude</span>
-          <input id="lat" inputmode="decimal" value="47.58">
+        <label class="form-field">
+          <span class="label-text" id="latLabel">Latitude</span>
+          <input class="input input-bordered input-sm" id="lat" inputmode="decimal" value="47.58">
         </label>
-        <label>
-          <span id="lonLabel">Longitude</span>
-          <input id="lon" inputmode="decimal" value="18.88">
+        <label class="form-field">
+          <span class="label-text" id="lonLabel">Longitude</span>
+          <input class="input input-bordered input-sm" id="lon" inputmode="decimal" value="18.88">
         </label>
-        <button id="locate" type="button">Use my location</button>
-        <label>
-          <span id="languageLabel">Language</span>
-          <select id="language">
+        <button class="btn btn-secondary btn-sm" id="locate" type="button">Use my location</button>
+        <label class="form-field">
+          <span class="label-text" id="languageLabel">Language</span>
+          <select class="select select-bordered select-sm" id="language">
             <option value="en-GB">English</option>
             <option value="hu-HU">Magyar</option>
           </select>
         </label>
-        <button id="refresh" type="submit">Refresh</button>
+        <button class="btn btn-primary btn-sm" id="refresh" type="submit">Refresh</button>
       </form>
     </header>
 
-    <div class="update-toast" id="updateToast" hidden>
+    <div class="alert alert-info update-toast" id="updateToast" hidden>
       <span id="updateToastText">New version available.</span>
-      <button id="updateReload" type="button">Reload</button>
+      <button class="btn btn-sm" id="updateReload" type="button">Reload</button>
     </div>
 
-    <section class="panel">
-      <h2 id="todayTitle">Today</h2>
+    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
+      <h2 class="card-title" id="todayTitle">Today</h2>
       <div class="today-grid" id="today"></div>
       <div class="status" id="status"></div>
       <p class="note" id="medianNote">Median values ignore sources that fail or do not report a metric. Precipitation is the median daily sum, not a probability.</p>
     </section>
 
-    <section class="panel">
-      <h2 id="forecastTitle">Forecast</h2>
+    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
+      <h2 class="card-title" id="forecastTitle">Forecast</h2>
       <div class="insight-panel" id="forecastInsight"></div>
       <div class="forecast-grid" id="forecast"></div>
     </section>
 
-    <section class="panel">
+    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
       <div class="map-head">
-        <h2 id="mapTitle">Weather Map</h2>
+        <h2 class="card-title" id="mapTitle">Weather Map</h2>
       </div>
       <iframe class="map-frame" id="weatherMap" title="Windy weather map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
       <p class="note" id="mapNote">Visual Windy cloud layer only. It is not part of the median forecast calculation.</p>
     </section>
 
-    <section class="panel">
-      <h2 id="advisoryTitle">Advisories</h2>
-      <div class="domain-tabs" role="tablist" aria-label="Advisory domains">
-        <button class="tab-button active" id="agriTab" type="button" role="tab" aria-controls="agriPanel" aria-selected="true">Agriculture</button>
-        <button class="tab-button" id="familyTab" type="button" role="tab" aria-controls="familyPanel" aria-selected="false">Family</button>
+    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
+      <h2 class="card-title" id="advisoryTitle">Advisories</h2>
+      <div class="tabs tabs-box domain-tabs" role="tablist" aria-label="Advisory domains">
+        <button class="tab active tab-active" id="agriTab" type="button" role="tab" aria-controls="agriPanel" aria-selected="true">Agriculture</button>
+        <button class="tab" id="familyTab" type="button" role="tab" aria-controls="familyPanel" aria-selected="false">Family</button>
       </div>
 
       <div class="advisory-panel" id="agriPanel" role="tabpanel" aria-labelledby="agriTab">
         <div class="toolbar">
-          <label>
-            <span id="cropLabel">Crop</span>
-            <select id="crop">
+          <label class="form-field">
+            <span class="label-text" id="cropLabel">Crop</span>
+            <select class="select select-bordered select-sm" id="crop">
               <option value="rapeseed">Rapeseed</option>
               <option value="wheat">Wheat</option>
               <option value="barley">Barley</option>
@@ -99,16 +102,16 @@
               <option value="sunflower">Sunflower</option>
             </select>
           </label>
-          <label>
-            <span id="workLabel">Work</span>
-            <select id="work">
+          <label class="form-field">
+            <span class="label-text" id="workLabel">Work</span>
+            <select class="select select-bordered select-sm" id="work">
               <option value="seeding">Seeding</option>
               <option value="harvesting">Harvesting</option>
               <option value="spraying">Spraying</option>
             </select>
           </label>
         </div>
-        <h3 id="hourlyTitle">Hourly Work Window</h3>
+        <h3 class="font-semibold" id="hourlyTitle">Hourly Work Window</h3>
         <div class="hourly-chart-wrap">
           <canvas id="hourlyChart"></canvas>
         </div>
@@ -125,14 +128,14 @@
       </div>
     </section>
 
-    <section class="panel">
-      <h2 id="providersTitle">Provider Snapshots</h2>
+    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
+      <h2 class="card-title" id="providersTitle">Provider Snapshots</h2>
       <div class="source-comparison" id="sourceComparison"></div>
       <div class="providers" id="providers"></div>
     </section>
 
-    <section>
-      <h2 id="sourcesTitle">Sources</h2>
+    <section class="panel card bg-base-100 border border-base-300 shadow-sm">
+      <h2 class="card-title" id="sourcesTitle">Sources</h2>
       <div id="sources"></div>
     </section>
   </main>

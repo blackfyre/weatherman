@@ -638,6 +638,8 @@ function setActiveDomain(domain, persist = false) {
   const familyActive = domain === ADVISORY_DOMAIN.FAMILY;
   agriTab.classList.toggle("active", !familyActive);
   familyTab.classList.toggle("active", familyActive);
+  agriTab.classList.toggle("tab-active", !familyActive);
+  familyTab.classList.toggle("tab-active", familyActive);
   agriTab.setAttribute("aria-selected", String(!familyActive));
   familyTab.setAttribute("aria-selected", String(familyActive));
   agriPanel.hidden = familyActive;
@@ -689,12 +691,12 @@ function applyBrowserLocale() {
 
 function useBrowserLocation() {
   if (!navigator.geolocation) {
-    statusEl.innerHTML = `<span class="pill bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationUnavailable)}</span>`;
+    statusEl.innerHTML = `<span class="pill badge badge-error badge-outline">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationUnavailable)}</span>`;
     return;
   }
 
   locateButton.disabled = true;
-  statusEl.innerHTML = `<span class="pill">${iconMarkup("fa-location-crosshairs")} ${escapeHtml(t().locating)}</span>`;
+  statusEl.innerHTML = `<span class="pill badge badge-info badge-outline">${iconMarkup("fa-location-crosshairs")} ${escapeHtml(t().locating)}</span>`;
   navigator.geolocation.getCurrentPosition(
     position => {
       place.value = "custom";
@@ -706,7 +708,7 @@ function useBrowserLocation() {
     },
     () => {
       locateButton.disabled = false;
-      statusEl.innerHTML = `<span class="pill bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationFailed)}</span>`;
+      statusEl.innerHTML = `<span class="pill badge badge-error badge-outline">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationFailed)}</span>`;
     },
     {
       enableHighAccuracy: false,
@@ -746,7 +748,7 @@ async function loadWeather() {
   sourceComparisonEl.innerHTML = "";
   providersEl.innerHTML = "";
   sourcesEl.innerHTML = "";
-  statusEl.innerHTML = `<span class="pill">${iconMarkup("fa-cloud-arrow-down")} ${escapeHtml(t().loading(providers.length))}</span>`;
+  statusEl.innerHTML = `<span class="pill badge badge-info badge-outline">${iconMarkup("fa-cloud-arrow-down")} ${escapeHtml(t().loading(providers.length))}</span>`;
 
   const results = await Promise.all(providers.map(provider => fetchProvider(provider, coords)));
   const usable = results.filter(result => result.ok);
@@ -767,7 +769,7 @@ async function loadWeather() {
 function readCoords() {
   const coords = parseCoords();
   if (!coords) {
-    statusEl.innerHTML = `<span class="pill bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().invalidCoords)}</span>`;
+    statusEl.innerHTML = `<span class="pill badge badge-error badge-outline">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().invalidCoords)}</span>`;
     return null;
   }
   return coords;
@@ -1105,7 +1107,8 @@ function renderStatus(results) {
     const cls = result.ok ? "ok" : "bad";
     const text = result.ok ? `${result.provider.name}: ${result.hourly.length} hours, ${formatFreshness(result)}` : `${result.provider.name}: ${result.error}`;
     const icon = result.ok ? "fa-circle-check" : "fa-triangle-exclamation";
-    return `<span class="pill ${cls}">${iconMarkup(icon)} ${escapeHtml(text)}</span>`;
+    const badge = result.ok ? "badge-success" : "badge-error";
+    return `<span class="pill badge ${badge} badge-outline ${cls}">${iconMarkup(icon)} ${escapeHtml(text)}</span>`;
   }).join("");
 }
 
@@ -1181,7 +1184,7 @@ function describeUvNuance(day) {
 function renderForecast(days) {
   const strings = t();
   forecastEl.innerHTML = days.map(day => `
-    <article class="day" style="--confidence-color: ${forecastConfidenceColor(day.confidence)}">
+    <article class="day card bg-base-100 border border-base-300 shadow-sm" style="--confidence-color: ${forecastConfidenceColor(day.confidence)}">
       <time datetime="${day.date}">${formatDate(day.date)}</time>
       <strong>${formatTemp(day.high)} / ${formatTemp(day.low)}</strong>
       <dl>
@@ -1253,7 +1256,7 @@ function renderHourlyWork(results) {
 function renderWorkWindowCards(windows) {
   const strings = t();
   workWindowsEl.innerHTML = windows.map(window => `
-    <article class="window-card ${window.evaluation.level}">
+    <article class="window-card card bg-base-100 border border-base-300 shadow-sm ${window.evaluation.level}">
       <strong>${formatWindowRange(window.startKey, window.endKey)}</strong>
       <span>${scoreIconMarkup(window.evaluation.level)} ${strings[window.evaluation.level]} · ${formatMm(window.summary.precip)} · ${formatKmh(window.summary.wind)}</span>
     </article>
@@ -1366,10 +1369,10 @@ function renderAgriculture(days) {
   agriEl.innerHTML = days.map((day, index) => {
     const evaluation = evaluateAgriculture(day, crop.value, work.value, days.slice(0, index));
     return `
-      <article class="agri-card">
+      <article class="agri-card card bg-base-100 border border-base-300 shadow-sm">
         <time datetime="${day.date}">${formatDate(day.date)}</time>
         <h3>${strings[crop.value]} - ${strings[work.value]}</h3>
-        <span class="score ${evaluation.level}">${scoreIconMarkup(evaluation.level)} ${strings[evaluation.level]}</span>
+        <span class="score badge ${scoreBadgeClass(evaluation.level)} ${evaluation.level}">${scoreIconMarkup(evaluation.level)} ${strings[evaluation.level]}</span>
         <dl>
           <dt>${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
           <dt>${strings.highLow}</dt><dd>${formatTemp(day.high)} / ${formatTemp(day.low)}</dd>
@@ -1392,10 +1395,10 @@ function renderFamily(days) {
   familyEl.innerHTML = days.map(day => {
     const advice = evaluateFamily(day);
     return `
-      <article class="family-card">
+      <article class="family-card card bg-base-100 border border-base-300 shadow-sm">
         <time datetime="${day.date}">${formatDate(day.date)}</time>
         <h3>${strings.dress}</h3>
-        <span class="score ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
+        <span class="score badge ${scoreBadgeClass(advice.level)} ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
         <ul class="reasons">
           ${advice.dress.map(reason => `<li>${escapeHtml(strings.familyReasons[reason])}</li>`).join("")}
         </ul>
@@ -1429,9 +1432,9 @@ function renderFamilyHighlight(days) {
         <time datetime="${tomorrow.date}">${formatDate(tomorrow.date)}</time>
         <h3>${escapeHtml(strings.tomorrowFamily)}</h3>
       </div>
-      <button id="familyReminder" type="button">${iconMarkup("fa-bell")} ${escapeHtml(strings.remindAtSeven)}</button>
+      <button class="btn btn-primary btn-sm" id="familyReminder" type="button">${iconMarkup("fa-bell")} ${escapeHtml(strings.remindAtSeven)}</button>
     </div>
-    <span class="score ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
+    <span class="score badge ${scoreBadgeClass(advice.level)} ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
     <p>${escapeHtml(strings.tomorrowSummary(strings[advice.level], dress, health))}</p>
   `;
 }
@@ -1650,15 +1653,15 @@ function renderProviders(results) {
   providersEl.innerHTML = results.map(result => {
     if (!result.ok) {
       return `
-        <article class="provider">
+        <article class="provider card bg-base-100 border border-base-300 shadow-sm">
           <h3>${iconMarkup("fa-satellite-dish")} ${escapeHtml(result.provider.name)}</h3>
-          <p class="error">${escapeHtml(result.error)}</p>
+          <p class="error alert alert-error">${escapeHtml(result.error)}</p>
         </article>
       `;
     }
     const today = dailyForProvider(result).find(day => day.date === budapestDateKey(new Date()));
     return `
-      <article class="provider">
+      <article class="provider card bg-base-100 border border-base-300 shadow-sm">
         <h3>${iconMarkup("fa-satellite-dish")} ${escapeHtml(result.provider.name)}</h3>
         <dl>
           <dt>${strings.fetched}</dt><dd>${formatFreshness(result)}</dd>
@@ -1688,7 +1691,7 @@ function renderSourceComparison(results) {
   sourceComparisonEl.innerHTML = `
     <h3>${iconMarkup("fa-table")} ${escapeHtml(strings.sourceComparison)}</h3>
     <div class="table-wrap">
-      <table>
+      <table class="table table-sm">
         <thead>
           <tr>
             <th>${escapeHtml(strings.sources)}</th>
@@ -1720,9 +1723,9 @@ function renderSources(results) {
   sourcesEl.innerHTML = results.map(result => {
     const payload = result.ok ? result.raw : { error: result.error };
     return `
-      <details>
-        <summary>${iconMarkup("fa-file-code")} ${escapeHtml(result.provider.name)} ${escapeHtml(t().rawData)}</summary>
-        <pre>${escapeHtml(JSON.stringify({
+      <details class="collapse collapse-arrow bg-base-100 border border-base-300">
+        <summary class="collapse-title">${iconMarkup("fa-file-code")} ${escapeHtml(result.provider.name)} ${escapeHtml(t().rawData)}</summary>
+        <pre class="collapse-content">${escapeHtml(JSON.stringify({
           url: result.url,
           fetchedAt: result.fetchedAt,
           payload
@@ -1745,7 +1748,7 @@ function loadingMetricMarkup() {
 
 function metricMarkup(icon, label, value, help) {
   return `
-    <article class="metric">
+    <article class="metric card bg-base-100 border border-base-300 shadow-sm">
       <span>${iconMarkup(icon)} ${label}</span>
       <strong>${value}</strong>
       <small>${help}</small>
@@ -1953,7 +1956,7 @@ function escapeHtml(value) {
 }
 
 function noteMarkup(message) {
-  return `<p class="note">${escapeHtml(message)}</p>`;
+  return `<p class="note alert alert-warning">${escapeHtml(message)}</p>`;
 }
 
 function iconMarkup(icon) {
@@ -1964,4 +1967,10 @@ function scoreIconMarkup(level) {
   if (level === SCORE.GOOD) return iconMarkup("fa-circle-check");
   if (level === SCORE.CAUTION) return iconMarkup("fa-triangle-exclamation");
   return iconMarkup("fa-circle-xmark");
+}
+
+function scoreBadgeClass(level) {
+  if (level === SCORE.GOOD) return "badge-success";
+  if (level === SCORE.CAUTION) return "badge-warning";
+  return "badge-error";
 }
