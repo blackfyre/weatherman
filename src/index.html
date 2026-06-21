@@ -63,15 +63,16 @@
 
     <section class="panel">
       <h2 id="forecastTitle">Forecast</h2>
+      <div class="insight-panel" id="forecastInsight"></div>
       <div class="forecast-grid" id="forecast"></div>
     </section>
 
     <section class="panel">
       <div class="map-head">
-        <h2 id="mapTitle">Radar Map</h2>
+        <h2 id="mapTitle">Weather Map</h2>
       </div>
       <iframe class="map-frame" id="weatherMap" title="Windy weather map" loading="lazy" referrerpolicy="no-referrer-when-downgrade"></iframe>
-      <p class="note" id="mapNote">Visual Windy layer only. It is not part of the median forecast calculation.</p>
+      <p class="note" id="mapNote">Visual Windy cloud layer only. It is not part of the median forecast calculation.</p>
     </section>
 
     <section class="panel">
@@ -121,6 +122,7 @@
 
     <section class="panel">
       <h2 id="providersTitle">Provider Snapshots</h2>
+      <div class="source-comparison" id="sourceComparison"></div>
       <div class="providers" id="providers"></div>
     </section>
 

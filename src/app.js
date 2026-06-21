@@ -111,6 +111,7 @@ const providers = [
 
 const todayEl = document.querySelector("#today");
 const forecastEl = document.querySelector("#forecast");
+const forecastInsightEl = document.querySelector("#forecastInsight");
 const hourlyChartCanvas = document.querySelector("#hourlyChart");
 const workWindowsEl = document.querySelector("#workWindows");
 const weatherMap = document.querySelector("#weatherMap");
@@ -118,6 +119,7 @@ const agriEl = document.querySelector("#agri");
 const familyHighlightEl = document.querySelector("#familyHighlight");
 const familyEl = document.querySelector("#family");
 const providersEl = document.querySelector("#providers");
+const sourceComparisonEl = document.querySelector("#sourceComparison");
 const sourcesEl = document.querySelector("#sources");
 const statusEl = document.querySelector("#status");
 const refreshButton = document.querySelector("#refresh");
@@ -154,13 +156,15 @@ const text = {
     forecast: "Forecast",
     hourly: "Hourly Work Window",
     hourlyNote: "Hourly median for the next 48 hours. Shaded 6-hour windows use the selected crop and work rules.",
-    map: "Radar Map",
-    mapNote: "Visual Windy layer only. It is not part of the median forecast calculation.",
+    map: "Weather Map",
+    mapNote: "Visual Windy cloud layer only. It is not part of the median forecast calculation.",
     advisories: "Advisories",
     agriculture: "Agricultural Work",
     family: "Family",
     providers: "Provider Snapshots",
     sources: "Sources",
+    insightTitle: "Forecast insight",
+    sourceComparison: "Source comparison",
     medianNote: "Median values ignore sources that fail or do not report a metric. Precipitation is the median daily sum, not a probability.",
     agriNote: "Heuristic field-work guidance only. It does not include soil moisture, crop stage, machinery limits or field access.",
     familyNote: "Practical weather-risk guidance only. It is not medical advice and does not account for personal health conditions.",
@@ -190,6 +194,30 @@ const text = {
     rain: "Rain",
     cloud: "Cloud",
     sourceCount: "Sources",
+    providerAgreement: "Provider agreement",
+    changeSinceLast: "Change since last forecast",
+    bestWindow: "Best work window",
+    noGoodWindow: "No good 6-hour work window in the next 48 hours.",
+    agriInputs: "Inputs behind the score",
+    wetness: "Carry-over wetness",
+    familySituations: "Daily situations",
+    schoolRun: "School run",
+    outdoorPlay: "Outdoor play",
+    middaySun: "Midday sun",
+    eveningWeather: "Evening",
+    agreementClose: "sources agree closely",
+    agreementMixed: "sources show moderate spread",
+    agreementWide: "sources disagree materially",
+    noHistoryChange: "no earlier local snapshot for this day",
+    noMeaningfulChange: "no meaningful change",
+    changedWetter: amount => `wetter by ${amount}`,
+    changedDrier: amount => `drier by ${amount}`,
+    changedWarmer: amount => `warmer by ${amount}`,
+    changedCooler: amount => `cooler by ${amount}`,
+    changedWindier: amount => `windier by ${amount}`,
+    changedCalmer: amount => `calmer by ${amount}`,
+    bestWindowSummary: (range, level, rain, wind) => `${range}: ${level}, ${rain} rain, ${wind} wind.`,
+    uvSuppressed: clearSky => `Clouds may be suppressing UV; clear-sky potential is ${clearSky}.`,
     high: "High",
     low: "Low",
     rawData: "raw data",
@@ -271,13 +299,15 @@ const text = {
     forecast: "Előrejelzés",
     hourly: "Óránkénti munkablak",
     hourlyNote: "Óránkénti medián a következő 48 órára. Az árnyékolt 6 órás ablakok a kiválasztott kultúra és munka szabályait használják.",
-    map: "Radartérkép",
-    mapNote: "Csak vizuális Windy réteg. Nem része a medián előrejelzés számításának.",
+    map: "Időjárási térkép",
+    mapNote: "Csak vizuális Windy felhőréteg. Nem része a medián előrejelzés számításának.",
     advisories: "Tanácsok",
     agriculture: "Mezőgazdasági munka",
     family: "Család",
     providers: "Források röviden",
     sources: "Nyers források",
+    insightTitle: "Előrejelzési összkép",
+    sourceComparison: "Forrás-összehasonlítás",
     medianNote: "A medián értékek kihagyják a hibás vagy hiányos forrásokat. A csapadék napi medián összeg, nem valószínűség.",
     agriNote: "Csak heurisztikus munkaszervezési jelzés. Nem tartalmaz talajnedvességet, fenológiai állapotot, gépkorlátot vagy területi megközelítést.",
     familyNote: "Csak gyakorlati időjárási kockázati jelzés. Nem orvosi tanács, és nem veszi figyelembe az egyéni egészségi állapotot.",
@@ -307,6 +337,30 @@ const text = {
     rain: "Eső",
     cloud: "Felhő",
     sourceCount: "Forrás",
+    providerAgreement: "Forrásegyezés",
+    changeSinceLast: "Változás az előző előrejelzéshez képest",
+    bestWindow: "Legjobb munkablak",
+    noGoodWindow: "Nincs jó 6 órás munkablak a következő 48 órában.",
+    agriInputs: "A pontszám bemenetei",
+    wetness: "Áthúzódó nedvesség",
+    familySituations: "Napi helyzetek",
+    schoolRun: "Iskolába menet",
+    outdoorPlay: "Kinti program",
+    middaySun: "Déli nap",
+    eveningWeather: "Este",
+    agreementClose: "a források szorosan együtt mozognak",
+    agreementMixed: "a források között közepes szórás van",
+    agreementWide: "a források érdemben eltérnek",
+    noHistoryChange: "nincs korábbi helyi pillanatkép erre a napra",
+    noMeaningfulChange: "nincs érdemi változás",
+    changedWetter: amount => `${amount} csapadékkal nedvesebb`,
+    changedDrier: amount => `${amount} csapadékkal szárazabb`,
+    changedWarmer: amount => `${amount} értékkel melegebb`,
+    changedCooler: amount => `${amount} értékkel hűvösebb`,
+    changedWindier: amount => `${amount} értékkel szelesebb`,
+    changedCalmer: amount => `${amount} értékkel gyengébb szél`,
+    bestWindowSummary: (range, level, rain, wind) => `${range}: ${level}, ${rain} eső, ${wind} szél.`,
+    uvSuppressed: clearSky => `A felhőzet csökkentheti az UV-t; derült égbolt mellett ${clearSky} lehetne.`,
     high: "Max",
     low: "Min",
     rawData: "nyers adat",
@@ -513,6 +567,7 @@ function renderAll(results, aggregate) {
   const usable = results.filter(result => result.ok);
   renderStatus(results);
   renderToday(aggregate.today, usable.length);
+  renderForecastInsight(aggregate.days, usable);
   renderForecast(aggregate.days);
   renderHourlyWork(usable);
   renderAgriculture(aggregate.days);
@@ -629,10 +684,12 @@ async function loadWeather() {
 
   refreshButton.disabled = true;
   todayEl.innerHTML = loadingMetricMarkup();
+  forecastInsightEl.innerHTML = "";
   forecastEl.innerHTML = "";
   agriEl.innerHTML = "";
   familyHighlightEl.innerHTML = "";
   familyEl.innerHTML = "";
+  sourceComparisonEl.innerHTML = "";
   providersEl.innerHTML = "";
   sourcesEl.innerHTML = "";
   statusEl.innerHTML = `<span class="pill">${iconMarkup("fa-cloud-arrow-down")} ${escapeHtml(t().loading(providers.length))}</span>`;
@@ -840,6 +897,8 @@ function aggregateDay(date, providerDays) {
   return {
     date,
     sources: providerDays.length,
+    providerDays,
+    spread: providerSpread(providerDays),
     currentTemp: median(providerDays.map(day => day.currentTemp)),
     high: median(providerDays.map(day => day.high)),
     low: median(providerDays.map(day => day.low)),
@@ -852,6 +911,24 @@ function aggregateDay(date, providerDays) {
   };
 }
 
+function providerSpread(providerDays) {
+  return {
+    high: rangeFor(providerDays.map(day => day.high)),
+    low: rangeFor(providerDays.map(day => day.low)),
+    precip: rangeFor(providerDays.map(day => day.precip)),
+    wind: rangeFor(providerDays.map(day => day.wind)),
+    uv: rangeFor(providerDays.map(day => day.uv))
+  };
+}
+
+function rangeFor(values) {
+  const clean = values.filter(value => Number.isFinite(value));
+  if (!clean.length) return { min: null, max: null, range: null, count: 0 };
+  const low = Math.min(...clean);
+  const high = Math.max(...clean);
+  return { min: low, max: high, range: high - low, count: clean.length };
+}
+
 function withForecastConfidence(days, history) {
   const previousDays = history.flatMap(snapshot => Array.isArray(snapshot.days) ? snapshot.days : []);
   return days.map((day, index) => {
@@ -859,7 +936,7 @@ function withForecastConfidence(days, history) {
     const base = index < 2 ? 96 - index * 3 : Math.max(58, 92 - index * 10);
     const penalty = previous ? forecastChangePenalty(day, previous) : 0;
     const score = Math.max(35, Math.round(base - penalty));
-    return { ...day, confidence: score };
+    return { ...day, confidence: score, previous };
   });
 }
 
@@ -959,6 +1036,64 @@ function renderToday(day, sourceCount) {
   ].join("");
 }
 
+function renderForecastInsight(days, results) {
+  const strings = t();
+  const target = days.find(day => day.date === tomorrowDateKey()) || days[1] || days[0];
+  const windows = workWindows(hourlyAggregate(results));
+  const bestWindow = windows.find(window => window.evaluation.level === SCORE.GOOD)
+    || windows.find(window => window.evaluation.level === SCORE.CAUTION);
+  const items = [
+    [strings.providerAgreement, describeProviderAgreement(target)],
+    [strings.changeSinceLast, describeForecastChange(target)],
+    [strings.bestWindow, describeBestWindow(bestWindow)]
+  ];
+  const uvNote = describeUvNuance(target);
+  if (uvNote) items.push([strings.uv, uvNote]);
+  forecastInsightEl.innerHTML = `
+    <h3>${iconMarkup("fa-chart-line")} ${escapeHtml(strings.insightTitle)}</h3>
+    <dl>
+      ${items.map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}
+    </dl>
+  `;
+}
+
+function describeProviderAgreement(day) {
+  if (!day?.sources || day.sources < 2) return t().noData;
+  const spread = day.spread || {};
+  const wide = (spread.precip?.range ?? 0) >= 5 || (spread.wind?.range ?? 0) >= 15 || (spread.high?.range ?? 0) >= 4;
+  const mixed = (spread.precip?.range ?? 0) >= 2 || (spread.wind?.range ?? 0) >= 8 || (spread.high?.range ?? 0) >= 2;
+  const label = wide ? t().agreementWide : mixed ? t().agreementMixed : t().agreementClose;
+  return `${label}: ${formatTempRange(spread.high)}, ${formatMmRange(spread.precip)}, ${formatKmhRange(spread.wind)}`;
+}
+
+function describeForecastChange(day) {
+  const strings = t();
+  if (!day?.previous) return strings.noHistoryChange;
+  const changes = [
+    changePhrase(day.precip, day.previous.precip, 1, formatMm, strings.changedWetter, strings.changedDrier),
+    changePhrase(day.high, day.previous.high, 1, formatTempDelta, strings.changedWarmer, strings.changedCooler),
+    changePhrase(day.wind, day.previous.wind, 4, formatKmh, strings.changedWindier, strings.changedCalmer)
+  ].filter(Boolean);
+  return changes[0] || strings.noMeaningfulChange;
+}
+
+function describeBestWindow(window) {
+  const strings = t();
+  if (!window) return strings.noGoodWindow;
+  return strings.bestWindowSummary(
+    formatWindowRange(window.startKey, window.endKey),
+    strings[window.evaluation.level],
+    formatMm(window.summary.precip),
+    formatKmh(window.summary.wind)
+  );
+}
+
+function describeUvNuance(day) {
+  if (!day || !Number.isFinite(day.uv) || !Number.isFinite(day.uvClearSky)) return "";
+  if (day.uvClearSky - day.uv < 2 || day.uvClearSky < 6) return "";
+  return t().uvSuppressed(formatUv(day.uvClearSky));
+}
+
 function renderForecast(days) {
   const strings = t();
   forecastEl.innerHTML = days.map(day => `
@@ -974,6 +1109,7 @@ function renderForecast(days) {
         <dt>${strings.cloud}</dt><dd>${formatPercent(day.cloud)}</dd>
         <dt>${strings.sourceCount}</dt><dd>${day.sources}</dd>
       </dl>
+      ${describeUvNuance(day) ? `<p class="card-note">${escapeHtml(describeUvNuance(day))}</p>` : ""}
     </article>
   `).join("");
 }
@@ -1151,9 +1287,13 @@ function renderAgriculture(days) {
         <h3>${strings[crop.value]} - ${strings[work.value]}</h3>
         <span class="score ${evaluation.level}">${scoreIconMarkup(evaluation.level)} ${strings[evaluation.level]}</span>
         <dl>
+          <dt>${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
+          <dt>${strings.highLow}</dt><dd>${formatTemp(day.high)} / ${formatTemp(day.low)}</dd>
           <dt>${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
           <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
+          <dt>${strings.cloud}</dt><dd>${formatPercent(day.cloud)}</dd>
         </dl>
+        <p class="card-note">${escapeHtml(strings.agriInputs)}: ${escapeHtml(agriInputSummary(day, days.slice(0, index)))}</p>
         <ul class="reasons">
           ${evaluation.reasons.map(reason => `<li>${escapeHtml(strings.reasons[reason])}</li>`).join("")}
         </ul>
@@ -1179,6 +1319,10 @@ function renderFamily(days) {
         <ul class="reasons">
           ${advice.health.map(reason => `<li>${escapeHtml(strings.familyReasons[reason])}</li>`).join("")}
         </ul>
+        <h3>${strings.familySituations}</h3>
+        <dl>
+          ${familySituationEntries(day).map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}
+        </dl>
       </article>
     `;
   }).join("");
@@ -1246,6 +1390,21 @@ function familyReminderMessage() {
   return strings.tomorrowSummary(strings[advice.level], dress, health);
 }
 
+function familySituationEntries(day) {
+  const strings = t();
+  const rain = day.precip ?? 0;
+  const wind = day.wind ?? 0;
+  const high = day.high ?? 0;
+  const low = day.low ?? 99;
+  const uv = day.uv ?? day.uvClearSky ?? 0;
+  return [
+    [strings.schoolRun, rain >= 8 || wind >= 35 ? strings.caution : strings.good],
+    [strings.outdoorPlay, rain >= 3 || wind >= 35 || high >= 34 ? strings.caution : strings.good],
+    [strings.middaySun, uv >= 6 || high >= 30 ? strings.caution : strings.good],
+    [strings.eveningWeather, low <= 8 || rain >= 1 ? strings.caution : strings.good]
+  ];
+}
+
 function evaluateFamily(day) {
   if (!day.sources) {
     return { level: SCORE.POOR, dress: ["noData"], health: ["noData"] };
@@ -1299,6 +1458,16 @@ function evaluateFamily(day) {
     if (!health.includes(reason)) health.push(reason);
     score += points;
   }
+}
+
+function agriInputSummary(day, previousDays) {
+  const wetness = carryOverWetness(previousDays, day);
+  return [
+    `${t().rain}: ${formatMm(day.precip)}`,
+    `${t().highLow}: ${formatTemp(day.high)} / ${formatTemp(day.low)}`,
+    `${t().cloud}: ${formatPercent(day.cloud)}`,
+    `${t().wetness}: ${wetness.toFixed(1)}`
+  ].join(", ");
 }
 
 function evaluateAgriculture(day, cropKey, workKey, previousDays = []) {
@@ -1382,6 +1551,7 @@ function dryingCredit(day) {
 
 function renderProviders(results) {
   const strings = t();
+  renderSourceComparison(results);
   providersEl.innerHTML = results.map(result => {
     if (!result.ok) {
       return `
@@ -1407,6 +1577,47 @@ function renderProviders(results) {
       </article>
     `;
   }).join("");
+}
+
+function renderSourceComparison(results) {
+  const strings = t();
+  const rows = results
+    .filter(result => result.ok)
+    .map(result => dailyForProvider(result).find(day => day.date === budapestDateKey(new Date())))
+    .filter(Boolean);
+  if (!rows.length) {
+    sourceComparisonEl.innerHTML = "";
+    return;
+  }
+  sourceComparisonEl.innerHTML = `
+    <h3>${iconMarkup("fa-table")} ${escapeHtml(strings.sourceComparison)}</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>${escapeHtml(strings.sources)}</th>
+            <th>${escapeHtml(strings.high)}</th>
+            <th>${escapeHtml(strings.low)}</th>
+            <th>${escapeHtml(strings.rain)}</th>
+            <th>${escapeHtml(strings.wind)}</th>
+            <th>${escapeHtml(strings.uv)}</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map(day => `
+            <tr>
+              <th scope="row">${escapeHtml(day.provider)}</th>
+              <td>${formatTemp(day.high)}</td>
+              <td>${formatTemp(day.low)}</td>
+              <td>${formatMm(day.precip)}</td>
+              <td>${formatKmh(day.wind)}</td>
+              <td>${formatUv(day.uv)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 function renderSources(results) {
@@ -1560,12 +1771,31 @@ function formatTemp(value) {
   return Number.isFinite(value) ? `${Math.round(value)}°C` : "n/a";
 }
 
+function formatTempDelta(value) {
+  return Number.isFinite(value) ? `${Math.abs(Math.round(value))}°C` : "n/a";
+}
+
+function formatTempRange(range) {
+  if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max)) return "n/a";
+  return `${formatTemp(range.min)}-${formatTemp(range.max)}`;
+}
+
 function formatMm(value) {
   return Number.isFinite(value) ? `${value.toFixed(1)} mm` : "n/a";
 }
 
+function formatMmRange(range) {
+  if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max)) return "n/a";
+  return `${formatMm(range.min)}-${formatMm(range.max)}`;
+}
+
 function formatKmh(value) {
   return Number.isFinite(value) ? `${Math.round(value)} km/h` : "n/a";
+}
+
+function formatKmhRange(range) {
+  if (!range || !Number.isFinite(range.min) || !Number.isFinite(range.max)) return "n/a";
+  return `${formatKmh(range.min)}-${formatKmh(range.max)}`;
 }
 
 function formatPercent(value) {
@@ -1586,6 +1816,13 @@ function forecastConfidenceColor(value) {
   if (score >= 70) return "19, 115, 51";
   if (score >= 50) return "161, 92, 0";
   return "180, 35, 24";
+}
+
+function changePhrase(current, previous, threshold, formatter, increase, decrease) {
+  if (!Number.isFinite(current) || !Number.isFinite(previous)) return "";
+  const delta = current - previous;
+  if (Math.abs(delta) < threshold) return "";
+  return delta > 0 ? increase(formatter(Math.abs(delta))) : decrease(formatter(Math.abs(delta)));
 }
 
 function escapeHtml(value) {
