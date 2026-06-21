@@ -150,11 +150,31 @@ section {
   margin-top: 12px;
 }
 
-.pill,
-.badge {
+.status-chip {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  background: var(--card);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.3;
+  white-space: normal;
+}
+
+.status-chip.ok {
+  border-color: color-mix(in oklab, var(--good) 35%, var(--line));
+  background: var(--good-soft);
+  color: var(--good);
+}
+
+.status-chip.bad {
+  border-color: color-mix(in oklab, var(--bad) 35%, var(--line));
+  background: var(--bad-soft);
+  color: var(--bad);
 }
 
 .update-toast {
@@ -531,6 +551,10 @@ pre {
 
   .today-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .status-chip {
+    width: 100%;
   }
 
   .insight-panel dl {

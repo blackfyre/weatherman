@@ -691,12 +691,12 @@ function applyBrowserLocale() {
 
 function useBrowserLocation() {
   if (!navigator.geolocation) {
-    statusEl.innerHTML = `<span class="pill badge badge-error badge-outline">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationUnavailable)}</span>`;
+    statusEl.innerHTML = `<span class="status-chip bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationUnavailable)}</span>`;
     return;
   }
 
   locateButton.disabled = true;
-  statusEl.innerHTML = `<span class="pill badge badge-info badge-outline">${iconMarkup("fa-location-crosshairs")} ${escapeHtml(t().locating)}</span>`;
+  statusEl.innerHTML = `<span class="status-chip">${iconMarkup("fa-location-crosshairs")} ${escapeHtml(t().locating)}</span>`;
   navigator.geolocation.getCurrentPosition(
     position => {
       place.value = "custom";
@@ -708,7 +708,7 @@ function useBrowserLocation() {
     },
     () => {
       locateButton.disabled = false;
-      statusEl.innerHTML = `<span class="pill badge badge-error badge-outline">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationFailed)}</span>`;
+      statusEl.innerHTML = `<span class="status-chip bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().geolocationFailed)}</span>`;
     },
     {
       enableHighAccuracy: false,
@@ -748,7 +748,7 @@ async function loadWeather() {
   sourceComparisonEl.innerHTML = "";
   providersEl.innerHTML = "";
   sourcesEl.innerHTML = "";
-  statusEl.innerHTML = `<span class="pill badge badge-info badge-outline">${iconMarkup("fa-cloud-arrow-down")} ${escapeHtml(t().loading(providers.length))}</span>`;
+  statusEl.innerHTML = `<span class="status-chip">${iconMarkup("fa-cloud-arrow-down")} ${escapeHtml(t().loading(providers.length))}</span>`;
 
   const results = await Promise.all(providers.map(provider => fetchProvider(provider, coords)));
   const usable = results.filter(result => result.ok);
@@ -769,7 +769,7 @@ async function loadWeather() {
 function readCoords() {
   const coords = parseCoords();
   if (!coords) {
-    statusEl.innerHTML = `<span class="pill badge badge-error badge-outline">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().invalidCoords)}</span>`;
+    statusEl.innerHTML = `<span class="status-chip bad">${iconMarkup("fa-triangle-exclamation")} ${escapeHtml(t().invalidCoords)}</span>`;
     return null;
   }
   return coords;
@@ -1107,8 +1107,7 @@ function renderStatus(results) {
     const cls = result.ok ? "ok" : "bad";
     const text = result.ok ? `${result.provider.name}: ${result.hourly.length} hours, ${formatFreshness(result)}` : `${result.provider.name}: ${result.error}`;
     const icon = result.ok ? "fa-circle-check" : "fa-triangle-exclamation";
-    const badge = result.ok ? "badge-success" : "badge-error";
-    return `<span class="pill badge ${badge} badge-outline ${cls}">${iconMarkup(icon)} ${escapeHtml(text)}</span>`;
+    return `<span class="status-chip ${cls}">${iconMarkup(icon)} ${escapeHtml(text)}</span>`;
   }).join("");
 }
 
