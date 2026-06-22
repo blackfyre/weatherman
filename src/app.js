@@ -1553,6 +1553,13 @@ const WeathermanApp = (() => {
         },
         tooltip: {
           callbacks: {
+            label(item) {
+              const label = item.dataset.label || "";
+              if (item.dataset.yAxisID === "temp") return `${label}: ${formatTemp(item.parsed.y)}`;
+              if (item.dataset.yAxisID === "rain") return `${label}: ${formatMm(item.parsed.y)}`;
+              if (item.dataset.yAxisID === "wind") return `${label}: ${formatKmh(item.parsed.y)}`;
+              return `${label}: ${item.formattedValue}`;
+            },
             afterBody(items) {
               const window = windows.find(candidate => items[0].dataIndex >= candidate.start && items[0].dataIndex <= candidate.end);
               const hour = hours[items[0].dataIndex];
