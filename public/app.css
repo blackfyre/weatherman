@@ -295,36 +295,20 @@ section {
   border-left: 5px solid rgba(var(--confidence-color, 15, 118, 110), .62);
 }
 
-.family-highlight {
-  border: 1px solid var(--highlight-line);
-  border-left: 5px solid var(--accent);
-  border-radius: 8px;
-  padding: 14px;
-  margin-bottom: 12px;
-  background: var(--highlight);
-}
-
-.family-highlight-head {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: flex-start;
-}
-
-.family-highlight h3 {
-  font-size: 18px;
-}
-
-.family-highlight p {
-  color: var(--muted);
-  margin-top: 8px;
-}
-
 .day time {
   color: var(--muted);
   font-size: 13px;
   font-weight: 700;
+}
+
+.family-card h3 + .reasons,
+.family-card h3 + dl {
+  margin-top: 10px;
+}
+
+.family-card .reasons + h3,
+.family-card dl + h3 {
+  margin-top: 16px;
 }
 
 .day strong {

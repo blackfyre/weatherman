@@ -126,7 +126,6 @@ const WeathermanApp = (() => {
   const workWindowsEl = document.querySelector("#workWindows");
   const weatherMap = document.querySelector("#weatherMap");
   const agriEl = document.querySelector("#agri");
-  const familyHighlightEl = document.querySelector("#familyHighlight");
   const familyEl = document.querySelector("#family");
   const providersEl = document.querySelector("#providers");
   const sourceComparisonEl = document.querySelector("#sourceComparison");
@@ -253,8 +252,6 @@ const WeathermanApp = (() => {
       sunflower: "Sunflower",
       dress: "Dress",
       health: "Health risks",
-      tomorrowFamily: "Tomorrow for the kids",
-      tomorrowSummary: (dress, health) => `${dress}. ${health}.`,
       good: "Good",
       caution: "Caution",
       poor: "Poor",
@@ -399,8 +396,6 @@ const WeathermanApp = (() => {
       sunflower: "Napraforgó",
       dress: "Öltözet",
       health: "Egészségi kockázatok",
-      tomorrowFamily: "Holnap a gyerekeknek",
-      tomorrowSummary: (dress, health) => `${dress}. ${health}.`,
       good: "Jó",
       caution: "Óvatosan",
       poor: "Nem ajánlott",
@@ -545,7 +540,6 @@ const WeathermanApp = (() => {
     forecastInsightEl.innerHTML = "";
     forecastEl.innerHTML = "";
     agriEl.innerHTML = "";
-    familyHighlightEl.innerHTML = "";
     familyEl.innerHTML = "";
     sourceComparisonEl.innerHTML = "";
     providersEl.innerHTML = "";
@@ -1598,7 +1592,6 @@ const WeathermanApp = (() => {
 
   function renderFamily(days) {
     const strings = t();
-    renderFamilyHighlight(days);
     familyEl.innerHTML = days.map(day => {
       const advice = evaluateFamily(day);
       return `
@@ -1620,29 +1613,6 @@ const WeathermanApp = (() => {
         </article>
       `;
     }).join("");
-  }
-
-  function renderFamilyHighlight(days) {
-    const strings = t();
-    const tomorrow = days.find(day => day.date === tomorrowDateKey()) || days.find(day => day.date > budapestDateKey(new Date())) || days[1];
-    if (!tomorrow) {
-      familyHighlightEl.innerHTML = noteMarkup(strings.noData);
-      return;
-    }
-
-    const advice = evaluateFamily(tomorrow);
-    const dress = advice.dress.map(reason => strings.familyReasons[reason]).join(", ");
-    const health = advice.health.map(reason => strings.familyReasons[reason]).join(", ");
-    familyHighlightEl.innerHTML = `
-      <div class="family-highlight-head">
-        <div>
-          <time datetime="${tomorrow.date}">${formatDate(tomorrow.date)}</time>
-          <h3>${escapeHtml(strings.tomorrowFamily)}</h3>
-        </div>
-      </div>
-      <span class="score badge ${scoreBadgeClass(advice.level)} ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
-      <p>${escapeHtml(strings.tomorrowSummary(dress, health))}</p>
-    `;
   }
 
   function renderProviders(results) {
