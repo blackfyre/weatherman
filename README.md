@@ -10,6 +10,10 @@ Weatherman is a static single-page weather application for Hungary-focused forec
 - `tests/` contains dependency-free smoke checks.
 - `Documentation/` contains project notes.
 
+## Documentation
+
+- [`Documentation/app-js-flow-chart.md`](Documentation/app-js-flow-chart.md) documents the `src/app.js` data flow with a Mermaid chart.
+
 ## Local Development
 
 Use mise for routine tasks:

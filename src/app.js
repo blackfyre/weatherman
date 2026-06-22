@@ -1,4 +1,82 @@
+/**
+ * @fileoverview Dependency-free weather median app for Hungary-relevant forecasts.
+ *
+ * The file is intentionally organised as a readable demo pipeline:
+ * external providers -> canonical hourly forecasts -> daily medians -> advisory heuristics -> DOM rendering.
+ */
 const WeathermanApp = (() => {
+  /** @typedef {{ lat: number, lon: number }} Coordinates */
+  /**
+   * Canonical hourly forecast shape shared by every provider adapter.
+   * All times are Budapest-local keys and all units are metric.
+   *
+   * @typedef {Object} ForecastHour
+   * @property {string} key Budapest-local hour key, for example `2026-06-22T14:00`.
+   * @property {string} date Budapest-local date key, for example `2026-06-22`.
+   * @property {?number} temp Temperature in Celsius.
+   * @property {?number} humidity Relative humidity percentage.
+   * @property {?number} precip Precipitation in millimetres for the hour.
+   * @property {?number} wind Wind speed in kilometres per hour.
+   * @property {?number} windDirection Wind direction in degrees.
+   * @property {?number} cloud Cloud cover percentage.
+   * @property {?number} [uv] UV index.
+   * @property {?number} [uvClearSky] Clear-sky UV index.
+   */
+  /**
+   * One provider's daily summary before cross-provider median aggregation.
+   *
+   * @typedef {Object} ProviderDayForecast
+   * @property {string} provider Provider display name.
+   * @property {string} date Budapest-local date key.
+   * @property {?number} currentTemp Current or nearest upcoming hourly temperature.
+   * @property {?number} humidity Daily median relative humidity percentage.
+   * @property {?number} high Daily high temperature in Celsius.
+   * @property {?number} low Daily low temperature in Celsius.
+   * @property {?number} precip Daily precipitation sum in millimetres.
+   * @property {?number} wind Daily maximum wind speed in kilometres per hour.
+   * @property {?number} windDirection Prevailing wind direction in degrees.
+   * @property {?number} cloud Daily median cloud cover percentage.
+   * @property {?number} uv Daily maximum UV index.
+   * @property {?number} uvClearSky Daily maximum clear-sky UV index.
+   */
+  /**
+   * Cross-provider daily median used by the UI and advisory heuristics.
+   *
+   * @typedef {ProviderDayForecast & {
+   *   sources: number,
+   *   providerDays: ProviderDayForecast[],
+   *   spread: Object,
+   *   confidence?: number,
+   *   previous?: AggregateDayForecast
+   * }} AggregateDayForecast
+   */
+  /**
+   * Provider fetch result. Failed providers stay in the result list so the UI can show source health.
+   *
+   * @typedef {Object} ProviderResult
+   * @property {boolean} ok Whether the provider returned usable data.
+   * @property {Object} provider Provider adapter metadata.
+   * @property {string} url Requested endpoint URL.
+   * @property {Object} [raw] Raw API payload.
+   * @property {ForecastHour[]} [hourly] Canonical hourly forecast rows.
+   * @property {Array<{date: string, uv: ?number, uvClearSky: ?number}>} [dailyUv] Daily UV rows.
+   * @property {string} fetchedAt ISO timestamp for display and cache freshness.
+   * @property {boolean} [fromCache] Whether the response came from the in-memory cache.
+   * @property {number} [cacheAgeMs] Age of the cached response.
+   * @property {string} [error] Human-readable provider failure.
+   */
+  /** @typedef {{ level: string, reasons: string[] }} ScoreEvaluation */
+  /**
+   * Fixed-size hourly window evaluated with the same agricultural rules as daily forecasts.
+   *
+   * @typedef {Object} WorkWindow
+   * @property {number} start First hourly index covered by the window.
+   * @property {number} end Last hourly index covered by the window.
+   * @property {string} startKey Budapest-local start hour key.
+   * @property {string} endKey Budapest-local end hour key.
+   * @property {AggregateDayForecast} summary Window-level aggregate weather summary.
+   * @property {ScoreEvaluation} evaluation Agricultural suitability score.
+   */
   const zone = "Europe/Budapest";
   const forecastDays = 5;
   const openMeteoHourly = "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover";
@@ -520,7 +598,13 @@ const WeathermanApp = (() => {
     }
   };
 
-    function start() {
+  /**
+   * Bootstraps DOM event listeners, restores saved preferences, applies static UI state, and loads weather data.
+   * This is the only method exposed from the module.
+   *
+   * @returns {void}
+   */
+  function start() {
     place.addEventListener("change", () => {
       if (place.value === "custom") return;
       const [nextLat, nextLon] = place.value.split(",");
@@ -567,6 +651,11 @@ const WeathermanApp = (() => {
 
   // Application Lifecycle
 
+  /**
+   * Registers the PWA service worker and exposes the update toast when a newer worker is waiting.
+   *
+   * @returns {void}
+   */
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator)) return;
     let reloadingForUpdate = false;
@@ -604,10 +693,21 @@ const WeathermanApp = (() => {
       .catch(() => {});
   }
 
+  /**
+   * Shows the reload prompt after a new service worker version is available.
+   *
+   * @returns {void}
+   */
   function showUpdateToast() {
     updateToast.hidden = false;
   }
 
+  /**
+   * Fetches all configured providers for the selected coordinates, aggregates usable forecasts, and renders the app.
+   * Failed providers are retained for source health display but excluded from median calculations.
+   *
+   * @returns {Promise<void>}
+   */
   async function loadWeather() {
     const coords = readCoords();
     if (!coords) return;
@@ -640,6 +740,13 @@ const WeathermanApp = (() => {
     refreshButton.disabled = false;
   }
 
+  /**
+   * Renders every weather-dependent section from the latest provider results and aggregate forecast.
+   *
+   * @param {ProviderResult[]} results Provider fetch results, including failures.
+   * @param {{ today: AggregateDayForecast, days: AggregateDayForecast[] }} aggregate Median forecast read model.
+   * @returns {void}
+   */
   function renderAll(results, aggregate) {
     const usable = results.filter(result => result.ok);
     renderStatus(results);
@@ -654,12 +761,23 @@ const WeathermanApp = (() => {
     renderSources(results);
   }
 
+  /**
+   * Re-renders the current forecast when a display preference changes without refetching providers.
+   *
+   * @returns {void}
+   */
   function rerenderCachedWeather() {
     if (lastAggregate) renderAll(lastResults, lastAggregate);
   }
 
   // Preferences And Client Inputs
 
+  /**
+   * Restores persisted controls and open sections from localStorage.
+   * Invalid or stale values are ignored so changed option sets do not break the page.
+   *
+   * @returns {boolean} Whether settings were restored.
+   */
   function loadSettings() {
     try {
       const settings = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null");
@@ -680,12 +798,23 @@ const WeathermanApp = (() => {
     }
   }
 
+  /**
+   * Applies the persisted accordion open/closed state.
+   *
+   * @param {string[]} openSections Section element IDs that should be open.
+   * @returns {void}
+   */
   function applySectionState(openSections) {
     sectionAccordions.forEach(section => {
       section.open = openSections.includes(section.id);
     });
   }
 
+  /**
+   * Persists the current controls and section state. Storage failures are ignored because persistence is optional.
+   *
+   * @returns {void}
+   */
   function saveSettings() {
     try {
       const coords = parseCoords();
@@ -713,6 +842,11 @@ const WeathermanApp = (() => {
     return [...select.options].some(option => option.value === value);
   }
 
+  /**
+   * Selects Hungarian when the browser advertises any Hungarian locale, otherwise falls back to British English.
+   *
+   * @returns {void}
+   */
   function applyBrowserLocale() {
     const browserLocale = (navigator.languages || [navigator.language])
       .filter(Boolean)
@@ -721,6 +855,11 @@ const WeathermanApp = (() => {
     language.value = browserLocale ? LOCALE.HU_HU : LOCALE.EN_GB;
   }
 
+  /**
+   * Reads the browser geolocation permission result into the coordinate controls and refreshes the forecast.
+   *
+   * @returns {void}
+   */
   function useBrowserLocation() {
     if (!navigator.geolocation) {
       statusEl.innerHTML = statusMessageMarkup(t().geolocationUnavailable, "error", "fa-triangle-exclamation");
@@ -750,6 +889,11 @@ const WeathermanApp = (() => {
     );
   }
 
+  /**
+   * Reads and validates coordinate controls, reporting a translated validation error in the status area.
+   *
+   * @returns {?Coordinates} Valid coordinates, or null when the current form values are invalid.
+   */
   function readCoords() {
     const coords = parseCoords();
     if (!coords) {
@@ -759,6 +903,12 @@ const WeathermanApp = (() => {
     return coords;
   }
 
+  /**
+   * Parses coordinate controls into numeric latitude and longitude values.
+   * Commas are accepted as decimal separators for Hungarian input habits.
+   *
+   * @returns {?Coordinates} Valid coordinates, or null when parsing or range validation fails.
+   */
   function parseCoords() {
     const coords = {
       lat: Number(lat.value.trim().replace(",", ".")),
@@ -772,11 +922,22 @@ const WeathermanApp = (() => {
 
   // Localisation And Theme
 
+  /**
+   * Returns the active translation table, falling back to English if the selected locale is unsupported.
+   *
+   * @returns {Object} Translation strings and formatter callbacks for the current locale.
+   */
   function t() {
     const locale = SUPPORTED_LOCALES.includes(language.value) ? language.value : LOCALE.EN_GB;
     return text[locale];
   }
 
+  /**
+   * Applies translated static labels and option text after startup or language changes.
+   * Dynamic weather sections are rendered separately from forecast data.
+   *
+   * @returns {void}
+   */
   function applyStaticText() {
     const strings = t();
     const locale = SUPPORTED_LOCALES.includes(language.value) ? language.value : LOCALE.EN_GB;
@@ -825,6 +986,11 @@ const WeathermanApp = (() => {
     sortSelectOptions(sport, locale);
   }
 
+  /**
+   * Rebuilds DaisyUI theme options while preserving the selected theme when it is still supported.
+   *
+   * @returns {void}
+   */
   function updateThemeOptions() {
     const selected = theme.value || "emerald";
     theme.innerHTML = SUPPORTED_THEMES
@@ -837,6 +1003,11 @@ const WeathermanApp = (() => {
     return name.replaceAll("-", " ").replace(/\b\w/g, letter => letter.toUpperCase());
   }
 
+  /**
+   * Applies the selected DaisyUI theme to the document root.
+   *
+   * @returns {void}
+   */
   function applyTheme() {
     document.documentElement.dataset.theme = SUPPORTED_THEMES.includes(theme.value) ? theme.value : "emerald";
   }
@@ -857,6 +1028,13 @@ const WeathermanApp = (() => {
 
   // External Provider Adapters
 
+  /**
+   * Builds an Open-Meteo-compatible forecast URL for all Open-Meteo-hosted provider APIs.
+   *
+   * @param {string} path API path such as `/v1/forecast` or `/v1/ecmwf`.
+   * @param {Coordinates} coords Forecast location.
+   * @returns {string} Fully qualified provider URL.
+   */
   function openMeteoUrl(path, coords) {
     const params = new URLSearchParams({
       latitude: coords.lat,
@@ -873,6 +1051,13 @@ const WeathermanApp = (() => {
     return `https://api.open-meteo.com${path}?${params}`;
   }
 
+  /**
+   * Fetches one provider with timeout and short-lived in-memory caching, then maps successful payloads to the canonical model.
+   *
+   * @param {Object} provider Provider adapter metadata.
+   * @param {Coordinates} coords Forecast location.
+   * @returns {Promise<ProviderResult>} Normalised provider result or a displayable failure result.
+   */
   async function fetchProvider(provider, coords) {
     const url = provider.url(coords);
     const cacheKey = `${provider.id}:${url}`;
@@ -923,6 +1108,12 @@ const WeathermanApp = (() => {
     }
   }
 
+  /**
+   * Parses a provider response body while preserving useful error text from non-JSON error responses.
+   *
+   * @param {Response} response Fetch API response.
+   * @returns {Promise<?Object>} Parsed JSON payload, null for empty error bodies, or a short error wrapper.
+   */
   async function parseProviderPayload(response) {
     const body = await response.text();
     if (!body) {
@@ -937,11 +1128,24 @@ const WeathermanApp = (() => {
     }
   }
 
+  /**
+   * Builds a compact provider error message from HTTP status and provider-specific error fields.
+   *
+   * @param {Response} response Fetch API response.
+   * @param {?Object} raw Parsed provider payload, when available.
+   * @returns {string} Human-readable provider failure.
+   */
   function providerErrorMessage(response, raw) {
     const message = raw?.reason || raw?.error || response.statusText;
     return message ? `${response.status} ${message}` : `${response.status}`;
   }
 
+  /**
+   * Converts Open-Meteo-style hourly arrays into canonical hourly forecast rows.
+   *
+   * @param {Object} raw Open-Meteo-compatible API payload.
+   * @returns {ForecastHour[]} Canonical hourly forecast rows.
+   */
   function normaliseOpenMeteo(raw) {
     const hourly = raw.hourly || {};
     return (hourly.time || []).map((time, index) => ({
@@ -958,6 +1162,12 @@ const WeathermanApp = (() => {
     }));
   }
 
+  /**
+   * Extracts daily UV maxima from providers that expose daily Open-Meteo fields.
+   *
+   * @param {Object} raw Open-Meteo-compatible API payload.
+   * @returns {Array<{date: string, uv: ?number, uvClearSky: ?number}>} Daily UV rows.
+   */
   function normaliseDailyUv(raw) {
     const daily = raw.daily || {};
     return (daily.time || []).map((date, index) => ({
@@ -967,6 +1177,13 @@ const WeathermanApp = (() => {
     }));
   }
 
+  /**
+   * Converts MET Norway's nested timeseries payload into canonical hourly forecast rows.
+   * MET Norway reports wind in metres per second, so this adapter converts wind to kilometres per hour.
+   *
+   * @param {Object} raw MET Norway locationforecast payload.
+   * @returns {ForecastHour[]} Canonical hourly forecast rows.
+   */
   function normaliseMetNo(raw) {
     return (raw.properties?.timeseries || []).map(entry => {
       const details = entry.data?.instant?.details || {};
@@ -988,6 +1205,13 @@ const WeathermanApp = (() => {
 
   // Forecast Read Models
 
+  /**
+   * Builds the median forecast read model from all usable provider results.
+   * Providers are first summarised independently by day, then each metric is median-aggregated across providers.
+   *
+   * @param {ProviderResult[]} results Successful provider results.
+   * @returns {{ today: AggregateDayForecast, days: AggregateDayForecast[] }} Daily median forecast model.
+   */
   function buildAggregate(results) {
     const today = budapestDateKey(new Date());
     const byProviderDay = results.flatMap(result => dailyForProvider(result, today));
@@ -999,6 +1223,12 @@ const WeathermanApp = (() => {
     };
   }
 
+  /**
+   * Summarises one provider's hourly rows into daily weather rows.
+   *
+   * @param {ProviderResult} result Successful provider result with canonical hourly data.
+   * @returns {ProviderDayForecast[]} Provider-level daily summaries.
+   */
   function dailyForProvider(result) {
     const groups = new Map();
     const uvByDate = new Map((result.dailyUv || []).map(day => [day.date, day]));
@@ -1022,6 +1252,13 @@ const WeathermanApp = (() => {
     }));
   }
 
+  /**
+   * Median-aggregates all provider summaries for one date.
+   *
+   * @param {string} date Budapest-local date key.
+   * @param {ProviderDayForecast[]} providerDays Provider-level summaries for the date.
+   * @returns {AggregateDayForecast} Cross-provider daily median and spread details.
+   */
   function aggregateDay(date, providerDays) {
     return {
       date,
@@ -1041,6 +1278,12 @@ const WeathermanApp = (() => {
     };
   }
 
+  /**
+   * Calculates min/max/range metadata used to explain provider agreement and confidence.
+   *
+   * @param {ProviderDayForecast[]} providerDays Provider-level daily summaries.
+   * @returns {Object} Spread metadata by metric.
+   */
   function providerSpread(providerDays) {
     return {
       high: rangeFor(providerDays.map(day => day.high)),
@@ -1052,6 +1295,12 @@ const WeathermanApp = (() => {
     };
   }
 
+  /**
+   * Calculates numeric range details while ignoring missing provider values.
+   *
+   * @param {Array<?number>} values Raw metric values.
+   * @returns {{ min: ?number, max: ?number, range: ?number, count: number }} Range metadata.
+   */
   function rangeFor(values) {
     const clean = values.filter(value => Number.isFinite(value));
     if (!clean.length) return { min: null, max: null, range: null, count: 0 };
@@ -1060,6 +1309,14 @@ const WeathermanApp = (() => {
     return { min: low, max: high, range: high - low, count: clean.length };
   }
 
+  /**
+   * Adds a rough confidence score to each day using forecast distance, source count, provider spread, and local history drift.
+   * The score is explanatory rather than meteorological truth; it helps users spot less stable forecasts.
+   *
+   * @param {AggregateDayForecast[]} days Current median forecast days.
+   * @param {Array<{days: AggregateDayForecast[]}>} history Locally stored earlier forecast snapshots.
+   * @returns {AggregateDayForecast[]} Forecast days with `confidence` and optional `previous` fields.
+   */
   function withForecastConfidence(days, history) {
     const previousDays = history.flatMap(snapshot => Array.isArray(snapshot.days) ? snapshot.days : []);
     return days.map((day, index) => {
@@ -1110,6 +1367,13 @@ const WeathermanApp = (() => {
     return Math.min(1, spread.range / range);
   }
 
+  /**
+   * Median-aggregates provider hours from the current Budapest hour forward.
+   *
+   * @param {ProviderResult[]} results Successful provider results.
+   * @param {number} [limit=48] Maximum number of hourly rows to return.
+   * @returns {ForecastHour[]} Cross-provider hourly median rows.
+   */
   function hourlyAggregate(results, limit = 48) {
     const currentKey = budapestHourKey(new Date());
     const byHour = new Map();
@@ -1136,6 +1400,14 @@ const WeathermanApp = (() => {
       }));
   }
 
+  /**
+   * Splits hourly forecasts into fixed-size windows and evaluates each window for the selected agricultural work.
+   *
+   * @param {ForecastHour[]} hours Cross-provider hourly forecast rows.
+   * @param {number} [size=6] Number of hours per window.
+   * @param {number} [step=size] Number of hours to advance between windows.
+   * @returns {WorkWindow[]} Evaluated agricultural work windows.
+   */
   function workWindows(hours, size = 6, step = size) {
     const windows = [];
     for (let start = 0; start < hours.length; start += step) {
@@ -1165,6 +1437,12 @@ const WeathermanApp = (() => {
     return windows;
   }
 
+  /**
+   * Picks the current Budapest-hour temperature, or the nearest upcoming hour when the exact hour is unavailable.
+   *
+   * @param {ForecastHour[]} hours Provider hourly rows for one day.
+   * @returns {?number} Current or next available temperature in Celsius.
+   */
   function nearestCurrentTemp(hours) {
     const currentKey = budapestHourKey(new Date());
     const exact = hours.find(hour => hour.key === currentKey);
@@ -1174,6 +1452,13 @@ const WeathermanApp = (() => {
 
   // Advisory Heuristics
 
+  /**
+   * Activates one advisory tab and optionally persists the selected domain.
+   *
+   * @param {string} domain Advisory domain key from `ADVISORY_DOMAIN`.
+   * @param {boolean} [persist=false] Whether to save the change to localStorage.
+   * @returns {void}
+   */
   function setActiveDomain(domain, persist = false) {
     const panels = [
       [ADVISORY_DOMAIN.AGRI, agriTab, agriPanel],
@@ -1191,12 +1476,24 @@ const WeathermanApp = (() => {
     if (persist) saveSettings();
   }
 
+  /**
+   * Reads the currently active advisory tab from DOM state.
+   *
+   * @returns {string} Active advisory domain key.
+   */
   function currentAdvisoryDomain() {
     if (familyTab.classList.contains("active")) return ADVISORY_DOMAIN.FAMILY;
     if (sportsTab.classList.contains("active")) return ADVISORY_DOMAIN.SPORTS;
     return ADVISORY_DOMAIN.AGRI;
   }
 
+  /**
+   * Produces family-oriented clothing and health guidance from a daily forecast.
+   * The scoring is deliberately heuristic and transparent so demo users can inspect the thresholds.
+   *
+   * @param {AggregateDayForecast} day Daily median forecast.
+   * @returns {{ level: string, dress: string[], health: string[] }} Family advisory score and reason keys.
+   */
   function evaluateFamily(day) {
     if (!day.sources) {
       return { level: SCORE.POOR, dress: ["noData"], health: ["noData"] };
@@ -1254,6 +1551,12 @@ const WeathermanApp = (() => {
     }
   }
 
+  /**
+   * Builds short situation labels for common family planning moments.
+   *
+   * @param {AggregateDayForecast} day Daily median forecast.
+   * @returns {Array<[string, string]>} Display label and score label pairs.
+   */
   function familySituationEntries(day) {
     const strings = t();
     const rain = day.precip ?? 0;
@@ -1270,6 +1573,13 @@ const WeathermanApp = (() => {
     ];
   }
 
+  /**
+   * Scores practical outdoor sport suitability for the selected sport.
+   *
+   * @param {AggregateDayForecast} day Daily median forecast.
+   * @param {string} sportKey Sport key from `SPORT`.
+   * @returns {ScoreEvaluation} Sports suitability score and reason keys.
+   */
   function evaluateSports(day, sportKey) {
     if (!day.sources) return { level: SCORE.POOR, reasons: ["noData"] };
 
@@ -1307,6 +1617,13 @@ const WeathermanApp = (() => {
     }
   }
 
+  /**
+   * Builds the compact evidence string shown under agricultural scores.
+   *
+   * @param {AggregateDayForecast} day Daily median forecast.
+   * @param {AggregateDayForecast[]} previousDays Earlier days used for wetness carry-over.
+   * @returns {string} Human-readable list of score inputs.
+   */
   function agriInputSummary(day, previousDays) {
     const wetness = carryOverWetness(previousDays, day);
     const inputs = [
@@ -1323,6 +1640,16 @@ const WeathermanApp = (() => {
     return inputs.join(", ");
   }
 
+  /**
+   * Scores agricultural work suitability for the selected crop and work type.
+   * The model favours explainable field-work rules over hidden optimisation.
+   *
+   * @param {AggregateDayForecast} day Daily or window-level weather summary.
+   * @param {string} cropKey Crop key from `CROP`.
+   * @param {string} workKey Work key from `WORK`.
+   * @param {AggregateDayForecast[]} [previousDays=[]] Earlier days used to estimate carry-over wetness.
+   * @returns {ScoreEvaluation} Agricultural suitability score and reason keys.
+   */
   function evaluateAgriculture(day, cropKey, workKey, previousDays = []) {
     if (!day.sources) {
       return { level: SCORE.POOR, reasons: ["noData"] };
@@ -1382,12 +1709,25 @@ const WeathermanApp = (() => {
     }
   }
 
+  /**
+   * Uses the wettest provider as the advisory rain value when provider spread exposes a wetter credible scenario.
+   *
+   * @param {AggregateDayForecast} day Daily median forecast.
+   * @returns {number} Rain value used by advisory rules.
+   */
   function advisoryRain(day) {
     const wettest = day.spread?.precip?.max;
     if (Number.isFinite(wettest)) return Math.max(day.precip ?? 0, wettest);
     return day.precip ?? 0;
   }
 
+  /**
+   * Estimates residual field wetness from the two preceding forecast days and today's drying conditions.
+   *
+   * @param {AggregateDayForecast[]} previousDays Earlier forecast days.
+   * @param {AggregateDayForecast} day Current day or work-window summary.
+   * @returns {number} Relative wetness score used by agricultural rules.
+   */
   function carryOverWetness(previousDays, day) {
     const recent = previousDays.slice(-2);
     const wetness = recent.reduce((total, previousDay, index) => {
@@ -1401,6 +1741,12 @@ const WeathermanApp = (() => {
     return Math.max(0, wetness - dryingCredit(day));
   }
 
+  /**
+   * Estimates how much today's weather helps reduce carry-over wetness.
+   *
+   * @param {AggregateDayForecast} day Current day or work-window summary.
+   * @returns {number} Drying credit subtracted from wetness carry-over.
+   */
   function dryingCredit(day) {
     let credit = 0;
     if ((day.precip ?? 0) <= 0.5) credit += 1;
@@ -1412,6 +1758,12 @@ const WeathermanApp = (() => {
 
   // Visual Embeds
 
+  /**
+   * Updates the Windy embed for the selected coordinates.
+   * The map is visual context only and is not used in forecast aggregation.
+   *
+   * @returns {void}
+   */
   function updateMap() {
     const coords = readCoords();
     if (!coords) return;
@@ -1510,6 +1862,13 @@ const WeathermanApp = (() => {
     return "comfort-poor";
   }
 
+  /**
+   * Renders the short forecast explanation panel: provider agreement, change since last snapshot, and best work window.
+   *
+   * @param {AggregateDayForecast[]} days Current median forecast days.
+   * @param {ProviderResult[]} results Successful provider results.
+   * @returns {void}
+   */
   function renderForecastInsight(days, results) {
     const strings = t();
     const target = days.find(day => day.date === tomorrowDateKey()) || days[1] || days[0];
@@ -1568,6 +1927,12 @@ const WeathermanApp = (() => {
     return t().uvSuppressed(formatUv(day.uvClearSky));
   }
 
+  /**
+   * Renders daily median forecast cards.
+   *
+   * @param {AggregateDayForecast[]} days Current median forecast days.
+   * @returns {void}
+   */
   function renderForecast(days) {
     const strings = t();
     forecastEl.innerHTML = days.map(day => `
@@ -1589,6 +1954,12 @@ const WeathermanApp = (() => {
     `).join("");
   }
 
+  /**
+   * Renders hourly median data, agricultural work-window cards, and the Chart.js visualisation when available.
+   *
+   * @param {ProviderResult[]} results Successful provider results.
+   * @returns {void}
+   */
   function renderHourlyWork(results) {
     const strings = t();
     const hours = hourlyAggregate(results);
@@ -1759,6 +2130,12 @@ const WeathermanApp = (() => {
     return "rgba(180, 35, 24, 0.08)";
   }
 
+  /**
+   * Renders daily agricultural suitability cards for the selected crop and work type.
+   *
+   * @param {AggregateDayForecast[]} days Current median forecast days.
+   * @returns {void}
+   */
   function renderAgriculture(days) {
     const strings = t();
     agriEl.innerHTML = days.map((day, index) => {
@@ -1785,6 +2162,12 @@ const WeathermanApp = (() => {
     }).join("");
   }
 
+  /**
+   * Renders daily family clothing and health guidance cards.
+   *
+   * @param {AggregateDayForecast[]} days Current median forecast days.
+   * @returns {void}
+   */
   function renderFamily(days) {
     const strings = t();
     familyEl.innerHTML = days.map(day => {
@@ -1810,6 +2193,12 @@ const WeathermanApp = (() => {
     }).join("");
   }
 
+  /**
+   * Renders daily outdoor sport suitability cards for the selected sport.
+   *
+   * @param {AggregateDayForecast[]} days Current median forecast days.
+   * @returns {void}
+   */
   function renderSports(days) {
     const strings = t();
     sportsEl.innerHTML = days.map(day => {
@@ -1835,6 +2224,12 @@ const WeathermanApp = (() => {
     }).join("");
   }
 
+  /**
+   * Renders per-provider snapshots and errors so users can inspect source health behind the median.
+   *
+   * @param {ProviderResult[]} results Provider fetch results, including failures.
+   * @returns {void}
+   */
   function renderProviders(results) {
     const strings = t();
     renderSourceComparison(results);
@@ -1867,6 +2262,12 @@ const WeathermanApp = (() => {
     }).join("");
   }
 
+  /**
+   * Renders today's side-by-side provider comparison table.
+   *
+   * @param {ProviderResult[]} results Provider fetch results, including failures.
+   * @returns {void}
+   */
   function renderSourceComparison(results) {
     const strings = t();
     const rows = results
@@ -1910,6 +2311,12 @@ const WeathermanApp = (() => {
     `;
   }
 
+  /**
+   * Renders raw provider payloads for demo transparency and manual debugging.
+   *
+   * @param {ProviderResult[]} results Provider fetch results, including failures.
+   * @returns {void}
+   */
   function renderSources(results) {
     sourcesEl.innerHTML = results.map(result => {
       const payload = result.ok ? result.raw : { error: result.error };
@@ -1957,10 +2364,22 @@ const WeathermanApp = (() => {
 
   // Forecast History
 
+  /**
+   * Builds the localStorage key for forecast history at a rounded coordinate pair.
+   *
+   * @param {Coordinates} coords Forecast location.
+   * @returns {string} Storage key for forecast snapshots.
+   */
   function forecastHistoryKey(coords) {
     return `${FORECAST_HISTORY_PREFIX}:${coords.lat.toFixed(4)},${coords.lon.toFixed(4)}`;
   }
 
+  /**
+   * Loads earlier forecast snapshots for the selected location.
+   *
+   * @param {Coordinates} coords Forecast location.
+   * @returns {Array<{fetchedAt: string, days: AggregateDayForecast[]}>} Stored forecast snapshots.
+   */
   function loadForecastHistory(coords) {
     try {
       const snapshots = JSON.parse(localStorage.getItem(forecastHistoryKey(coords)) || "[]");
@@ -1970,6 +2389,13 @@ const WeathermanApp = (() => {
     }
   }
 
+  /**
+   * Stores a compact forecast snapshot for later confidence and change comparisons.
+   *
+   * @param {Coordinates} coords Forecast location.
+   * @param {AggregateDayForecast[]} days Current median forecast days.
+   * @returns {void}
+   */
   function saveForecastHistory(coords, days) {
     try {
       const snapshots = loadForecastHistory(coords);
@@ -1985,6 +2411,12 @@ const WeathermanApp = (() => {
 
   // Calculation Utilities
 
+  /**
+   * Calculates the median of finite numeric values, returning null when no values are usable.
+   *
+   * @param {Array<?number>} values Candidate numeric values.
+   * @returns {?number} Median value.
+   */
   function median(values) {
     const clean = values.filter(value => Number.isFinite(value)).sort((a, b) => a - b);
     if (!clean.length) return null;
@@ -1992,21 +2424,45 @@ const WeathermanApp = (() => {
     return clean.length % 2 ? clean[middle] : (clean[middle - 1] + clean[middle]) / 2;
   }
 
+  /**
+   * Calculates the maximum finite numeric value.
+   *
+   * @param {Array<?number>} values Candidate numeric values.
+   * @returns {?number} Maximum value.
+   */
   function max(values) {
     const clean = values.filter(value => Number.isFinite(value));
     return clean.length ? Math.max(...clean) : null;
   }
 
+  /**
+   * Calculates the minimum finite numeric value.
+   *
+   * @param {Array<?number>} values Candidate numeric values.
+   * @returns {?number} Minimum value.
+   */
   function min(values) {
     const clean = values.filter(value => Number.isFinite(value));
     return clean.length ? Math.min(...clean) : null;
   }
 
+  /**
+   * Sums finite numeric values, returning null when no values are usable.
+   *
+   * @param {Array<?number>} values Candidate numeric values.
+   * @returns {?number} Sum of finite values.
+   */
   function sum(values) {
     const clean = values.filter(value => Number.isFinite(value));
     return clean.length ? clean.reduce((total, value) => total + value, 0) : null;
   }
 
+  /**
+   * Finds the most common eight-point compass sector from wind direction degrees.
+   *
+   * @param {Array<?number>} values Wind directions in degrees.
+   * @returns {?number} Prevailing direction in degrees, rounded to 45-degree sectors.
+   */
   function prevailingDirection(values) {
     const clean = values.filter(value => Number.isFinite(value));
     if (!clean.length) return null;
@@ -2029,6 +2485,12 @@ const WeathermanApp = (() => {
 
   // Date And Formatting Utilities
 
+  /**
+   * Formats a date as a Budapest-local `YYYY-MM-DD` key.
+   *
+   * @param {Date} date Absolute date/time.
+   * @returns {string} Budapest-local date key.
+   */
   function budapestDateKey(date) {
     return partsFor(date).slice(0, 3).join("-");
   }
@@ -2037,11 +2499,23 @@ const WeathermanApp = (() => {
     return budapestDateKey(new Date(Date.now() + 24 * 60 * 60 * 1000));
   }
 
+  /**
+   * Formats a date as a Budapest-local hourly key used to align provider timeseries rows.
+   *
+   * @param {Date} date Absolute date/time.
+   * @returns {string} Budapest-local hour key.
+   */
   function budapestHourKey(date) {
     const [year, month, day, hour] = partsFor(date);
     return `${year}-${month}-${day}T${hour}:00`;
   }
 
+  /**
+   * Extracts Budapest-local date and hour parts with `Intl.DateTimeFormat` to avoid manual timezone maths.
+   *
+   * @param {Date} date Absolute date/time.
+   * @returns {string[]} `[year, month, day, hour]` with zero-padded month, day, and hour.
+   */
   function partsFor(date) {
     const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: zone,
@@ -2163,6 +2637,17 @@ const WeathermanApp = (() => {
     return "180, 35, 24";
   }
 
+  /**
+   * Builds a translated change phrase when a metric changed beyond a display threshold.
+   *
+   * @param {?number} current Current metric value.
+   * @param {?number} previous Previous snapshot metric value.
+   * @param {number} threshold Minimum absolute delta before a phrase is returned.
+   * @param {Function} formatter Metric formatter.
+   * @param {Function} increase Translation callback for positive deltas.
+   * @param {Function} decrease Translation callback for negative deltas.
+   * @returns {string} Change phrase or an empty string.
+   */
   function changePhrase(current, previous, threshold, formatter, increase, decrease) {
     if (!Number.isFinite(current) || !Number.isFinite(previous)) return "";
     const delta = current - previous;
@@ -2172,6 +2657,12 @@ const WeathermanApp = (() => {
 
   // Markup Utilities
 
+  /**
+   * Escapes untrusted text before interpolation into HTML strings.
+   *
+   * @param {*} value Value to escape.
+   * @returns {string} HTML-safe text.
+   */
   function escapeHtml(value) {
     return String(value)
       .replaceAll("&", "&amp;")
@@ -2189,12 +2680,24 @@ const WeathermanApp = (() => {
     return `<i class="fa-solid ${icon}" aria-hidden="true"></i>`;
   }
 
+  /**
+   * Returns the Font Awesome status icon for a score level.
+   *
+   * @param {string} level Score key from `SCORE`.
+   * @returns {string} Icon markup.
+   */
   function scoreIconMarkup(level) {
     if (level === SCORE.GOOD) return iconMarkup("fa-circle-check");
     if (level === SCORE.CAUTION) return iconMarkup("fa-triangle-exclamation");
     return iconMarkup("fa-circle-xmark");
   }
 
+  /**
+   * Returns the DaisyUI badge class for a score level.
+   *
+   * @param {string} level Score key from `SCORE`.
+   * @returns {string} Badge class name.
+   */
   function scoreBadgeClass(level) {
     if (level === SCORE.GOOD) return "badge-success";
     if (level === SCORE.CAUTION) return "badge-warning";
