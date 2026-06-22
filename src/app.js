@@ -1316,12 +1316,47 @@ const WeathermanApp = (() => {
   function renderToday(day, sourceCount) {
     const strings = t();
     todayEl.innerHTML = [
-      metricMarkup("fa-temperature-half", strings.now, formatTemp(day.currentTemp), strings.activeSources(sourceCount)),
-      metricMarkup("fa-arrows-up-down", strings.highLow, `${formatTemp(day.high)} / ${formatTemp(day.low)}`, strings.dailyRange),
-      metricMarkup("fa-cloud-rain", strings.precipitation, formatMm(day.precip), strings.dailyTotal),
-      metricMarkup("fa-sun", strings.uv, formatUv(day.uv), `${strings.dailyUvMax} · ${strings.uvClearSky}: ${formatUv(day.uvClearSky)}`),
-      metricMarkup("fa-wind", strings.wind, formatKmh(day.wind), `${strings.dailyMax} · ${formatWindDirection(day.windDirection)}`)
+      metricMarkup("fa-temperature-half", strings.now, formatTemp(day.currentTemp), strings.activeSources(sourceCount), comfortClassForTemp(day.currentTemp)),
+      metricMarkup("fa-arrows-up-down", strings.highLow, `${formatTemp(day.high)} / ${formatTemp(day.low)}`, strings.dailyRange, comfortClassForDailyRange(day.high, day.low)),
+      metricMarkup("fa-cloud-rain", strings.precipitation, formatMm(day.precip), strings.dailyTotal, comfortClassForRain(day.precip)),
+      metricMarkup("fa-sun", strings.uv, formatUv(day.uv), `${strings.dailyUvMax} · ${strings.uvClearSky}: ${formatUv(day.uvClearSky)}`, comfortClassForUv(day.uv)),
+      metricMarkup("fa-wind", strings.wind, formatKmh(day.wind), `${strings.dailyMax} · ${formatWindDirection(day.windDirection)}`, comfortClassForWind(day.wind))
     ].join("");
+  }
+
+  function comfortClassForTemp(temp) {
+    if (!Number.isFinite(temp)) return "";
+    if (temp >= 18 && temp <= 26) return "comfort-good";
+    if (temp >= 10 && temp <= 30) return "comfort-caution";
+    return "comfort-poor";
+  }
+
+  function comfortClassForDailyRange(high, low) {
+    if (!Number.isFinite(high) || !Number.isFinite(low)) return "";
+    if (high <= 26 && low >= 10) return "comfort-good";
+    if (high <= 30 && low >= 3) return "comfort-caution";
+    return "comfort-poor";
+  }
+
+  function comfortClassForRain(rain) {
+    if (!Number.isFinite(rain)) return "";
+    if (rain < 1) return "comfort-good";
+    if (rain < 8) return "comfort-caution";
+    return "comfort-poor";
+  }
+
+  function comfortClassForUv(uv) {
+    if (!Number.isFinite(uv)) return "";
+    if (uv < 3) return "comfort-good";
+    if (uv < 6) return "comfort-caution";
+    return "comfort-poor";
+  }
+
+  function comfortClassForWind(wind) {
+    if (!Number.isFinite(wind)) return "";
+    if (wind < 20) return "comfort-good";
+    if (wind < 35) return "comfort-caution";
+    return "comfort-poor";
   }
 
   function renderForecastInsight(days, results) {
@@ -1720,9 +1755,10 @@ const WeathermanApp = (() => {
     ].join("");
   }
 
-  function metricMarkup(icon, label, value, help) {
+  function metricMarkup(icon, label, value, help, comfortClass = "") {
+    const className = ["metric card bg-base-100 border border-base-300 shadow-sm", comfortClass].filter(Boolean).join(" ");
     return `
-      <article class="metric card bg-base-100 border border-base-300 shadow-sm">
+      <article class="${className}">
         <span>${iconMarkup(icon)} ${label}</span>
         <strong>${value}</strong>
         <small>${help}</small>

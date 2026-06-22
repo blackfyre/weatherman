@@ -225,9 +225,37 @@ section {
 .metric {
   min-height: 112px;
   border: 1px solid var(--line);
+  border-left-width: 5px;
   border-radius: 8px;
   padding: 14px;
   background: var(--card);
+}
+
+.metric.comfort-good {
+  border-left-color: var(--good);
+  background: var(--good-soft);
+}
+
+.metric.comfort-caution {
+  border-left-color: var(--warn);
+  background: var(--warn-soft);
+}
+
+.metric.comfort-poor {
+  border-left-color: var(--bad);
+  background: var(--bad-soft);
+}
+
+.metric.comfort-good strong {
+  color: var(--good);
+}
+
+.metric.comfort-caution strong {
+  color: var(--warn);
+}
+
+.metric.comfort-poor strong {
+  color: var(--bad);
 }
 
 .metric span {
