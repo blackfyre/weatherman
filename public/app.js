@@ -179,6 +179,8 @@ const WeathermanApp = (() => {
       family: "Family",
       providers: "Provider Snapshots",
       sources: "Sources",
+      footerText: "Open-source weather median app.",
+      license: "MIT license",
       insightTitle: "Forecast insight",
       sourceComparison: "Source comparison",
       medianNote: "Median values ignore sources that fail or do not report a metric. Precipitation is the median daily sum, not a probability.",
@@ -323,6 +325,8 @@ const WeathermanApp = (() => {
       family: "Család",
       providers: "Források röviden",
       sources: "Nyers források",
+      footerText: "Nyílt forráskódú időjárási medián alkalmazás.",
+      license: "MIT licenc",
       insightTitle: "Előrejelzési összkép",
       sourceComparison: "Forrás-összehasonlítás",
       medianNote: "A medián értékek kihagyják a hibás vagy hiányos forrásokat. A csapadék napi medián összeg, nem valószínűség.",
@@ -725,6 +729,8 @@ const WeathermanApp = (() => {
     familyTab.innerHTML = `${iconMarkup("fa-people-roof")} ${escapeHtml(strings.family)}`;
     document.querySelector("#providersTitle").innerHTML = `${iconMarkup("fa-satellite-dish")} ${escapeHtml(strings.providers)}`;
     document.querySelector("#sourcesTitle").innerHTML = `${iconMarkup("fa-code")} ${escapeHtml(strings.sources)}`;
+    document.querySelector("#footerText").textContent = strings.footerText;
+    document.querySelector("#licenseLink").textContent = strings.license;
     document.querySelector("#medianNote").textContent = strings.medianNote;
     document.querySelector("#agriNote").textContent = strings.agriNote;
     document.querySelector("#familyNote").textContent = strings.familyNote;
