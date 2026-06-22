@@ -26,11 +26,18 @@ const WeathermanApp = (() => {
   });
   const ADVISORY_DOMAIN = Object.freeze({
     AGRI: "agri",
-    FAMILY: "family"
+    FAMILY: "family",
+    SPORTS: "sports"
+  });
+  const SPORT = Object.freeze({
+    HIKING: "hiking",
+    MOUNTAIN_BIKING: "mountainBiking",
+    OPEN_WATER_SWIMMING: "openWaterSwimming"
   });
   const SUPPORTED_LOCALES = Object.freeze([LOCALE.EN_GB, LOCALE.HU_HU]);
   const SUPPORTED_CROPS = Object.freeze(Object.values(CROP));
   const SUPPORTED_WORK = Object.freeze(Object.values(WORK));
+  const SUPPORTED_SPORTS = Object.freeze(Object.values(SPORT));
   const SUPPORTED_ADVISORY_DOMAINS = Object.freeze(Object.values(ADVISORY_DOMAIN));
   const SUPPORTED_THEMES = Object.freeze([
     "light", "dark", "cupcake", "bumblebee", "emerald", "corporate", "synthwave", "retro", "cyberpunk",
@@ -68,6 +75,15 @@ const WeathermanApp = (() => {
     HEAT_STRESS_C: 34,
     HUMID_HEAT_STRESS_C: 30,
     HUMID_HEAT_PERCENT: 70,
+    SPORT_RAIN_CAUTION_MM: 2,
+    SPORT_RAIN_POOR_MM: 8,
+    SPORT_WIND_CAUTION_KMH: 25,
+    SPORT_WIND_POOR_KMH: 40,
+    SPORT_HOT_C: 30,
+    SPORT_COLD_C: 5,
+    SWIM_MIN_C: 20,
+    SWIM_WIND_CAUTION_KMH: 18,
+    SWIM_WIND_POOR_KMH: 28,
     SATURATED_WETNESS: 4,
     PARTIAL_DRYING_WETNESS: 2
   });
@@ -131,6 +147,7 @@ const WeathermanApp = (() => {
   const weatherMap = document.querySelector("#weatherMap");
   const agriEl = document.querySelector("#agri");
   const familyEl = document.querySelector("#family");
+  const sportsEl = document.querySelector("#sports");
   const providersEl = document.querySelector("#providers");
   const sourceComparisonEl = document.querySelector("#sourceComparison");
   const sourcesEl = document.querySelector("#sources");
@@ -148,10 +165,13 @@ const WeathermanApp = (() => {
   const theme = document.querySelector("#theme");
   const crop = document.querySelector("#crop");
   const work = document.querySelector("#work");
+  const sport = document.querySelector("#sport");
   const agriTab = document.querySelector("#agriTab");
   const familyTab = document.querySelector("#familyTab");
+  const sportsTab = document.querySelector("#sportsTab");
   const agriPanel = document.querySelector("#agriPanel");
   const familyPanel = document.querySelector("#familyPanel");
+  const sportsPanel = document.querySelector("#sportsPanel");
   const sectionAccordions = SECTION_IDS.map(id => document.querySelector(`#${id}`));
   let lastResults = [];
   let lastAggregate = null;
@@ -168,6 +188,7 @@ const WeathermanApp = (() => {
       theme: "Theme",
       crop: "Crop",
       work: "Work",
+      sport: "Sport",
       refresh: "Refresh",
       locate: "Use my location",
       updateAvailable: "New version available.",
@@ -181,6 +202,7 @@ const WeathermanApp = (() => {
       advisories: "Advisories",
       agriculture: "Agricultural Work",
       family: "Family",
+      sports: "Sports",
       providers: "Provider Snapshots",
       sources: "Sources",
       footerText: "Open-source weather median app.",
@@ -190,6 +212,7 @@ const WeathermanApp = (() => {
       medianNote: "Median values ignore sources that fail or do not report a metric. Precipitation is the median daily sum, not a probability.",
       agriNote: "Heuristic field-work guidance only. It does not include soil moisture, crop stage, machinery limits or field access.",
       familyNote: "Practical weather-risk guidance only. It is not medical advice and does not account for personal health conditions.",
+      sportsNote: "Practical outdoor sport guidance only. It does not replace local trail, water-quality, lifeguard or storm warnings.",
       loading: count => `Loading ${count} sources...`,
       providerTimeout: seconds => `Provider timed out after ${seconds} seconds.`,
       invalidCoords: "Latitude must be between -90 and 90. Longitude must be between -180 and 180.",
@@ -258,6 +281,9 @@ const WeathermanApp = (() => {
       barley: "Barley",
       corn: "Corn",
       sunflower: "Sunflower",
+      hiking: "Hiking",
+      mountainBiking: "Mountain biking",
+      openWaterSwimming: "Open-water swimming",
       dress: "Dress",
       health: "Health risks",
       good: "Good",
@@ -306,6 +332,20 @@ const WeathermanApp = (() => {
         strongWind: "strong wind can make walking, cycling and playground time harder",
         heavyRain: "heavy rain may disrupt school runs and outdoor plans",
         noData: "no usable forecast data"
+      },
+      sportsReasons: {
+        rain: "rain may reduce grip, visibility or comfort",
+        heavyRain: "heavy rain makes conditions unreliable",
+        wind: "wind may make exposed areas harder to manage",
+        heat: "heat increases exertion and hydration risk",
+        cold: "cold conditions need extra layers and caution",
+        stormRisk: "rain with strong wind suggests possible storm exposure",
+        trailWet: "wet trails may be slippery or vulnerable to damage",
+        swimCold: "air temperature is low for open-water swimming comfort",
+        swimWind: "wind can make open water choppy and harder to exit safely",
+        swimRain: "rain can reduce visibility and comfort on open water",
+        workable: "weather looks suitable for the selected sport",
+        noData: "no usable forecast data"
       }
     },
     [LOCALE.HU_HU]: {
@@ -318,6 +358,7 @@ const WeathermanApp = (() => {
       theme: "Téma",
       crop: "Kultúra",
       work: "Munka",
+      sport: "Sport",
       refresh: "Frissítés",
       locate: "Saját helyzet",
       updateAvailable: "Új verzió érhető el.",
@@ -331,6 +372,7 @@ const WeathermanApp = (() => {
       advisories: "Tanácsok",
       agriculture: "Mezőgazdasági munka",
       family: "Család",
+      sports: "Sport",
       providers: "Források röviden",
       sources: "Nyers források",
       footerText: "Nyílt forráskódú időjárási medián alkalmazás.",
@@ -340,6 +382,7 @@ const WeathermanApp = (() => {
       medianNote: "A medián értékek kihagyják a hibás vagy hiányos forrásokat. A csapadék napi medián összeg, nem valószínűség.",
       agriNote: "Csak heurisztikus munkaszervezési jelzés. Nem tartalmaz talajnedvességet, fenológiai állapotot, gépkorlátot vagy területi megközelítést.",
       familyNote: "Csak gyakorlati időjárási kockázati jelzés. Nem orvosi tanács, és nem veszi figyelembe az egyéni egészségi állapotot.",
+      sportsNote: "Csak gyakorlati kültéri sportjelzés. Nem helyettesíti a helyi túraútvonal-, vízminőségi, vízimentői vagy viharjelzéseket.",
       loading: count => `${count} forrás betöltése...`,
       providerTimeout: seconds => `A forrás ${seconds} másodperc után időtúllépésre futott.`,
       invalidCoords: "A szélességnek -90 és 90, a hosszúságnak -180 és 180 között kell lennie.",
@@ -408,6 +451,9 @@ const WeathermanApp = (() => {
       barley: "Árpa",
       corn: "Kukorica",
       sunflower: "Napraforgó",
+      hiking: "Túrázás",
+      mountainBiking: "Hegyi kerékpározás",
+      openWaterSwimming: "Nyílt vízi úszás",
       dress: "Öltözet",
       health: "Egészségi kockázatok",
       good: "Jó",
@@ -456,6 +502,20 @@ const WeathermanApp = (() => {
         strongWind: "az erős szél nehezítheti a sétát, biciklizést és játszóterezést",
         heavyRain: "a nagy eső zavarhatja az iskolába járást és a kinti programokat",
         noData: "nincs használható előrejelzés"
+      },
+      sportsReasons: {
+        rain: "az eső ronthatja a tapadást, láthatóságot vagy komfortot",
+        heavyRain: "a nagy eső megbízhatatlanná teszi a körülményeket",
+        wind: "a szél nehezítheti a kitett szakaszokat",
+        heat: "a hőség növeli a terhelési és hidratálási kockázatot",
+        cold: "hidegben több réteg és nagyobb óvatosság kell",
+        stormRisk: "az eső és erős szél viharkitettségre utalhat",
+        trailWet: "a vizes útvonal csúszós lehet vagy sérülékenyebb lehet",
+        swimCold: "a levegő hűvös a nyílt vízi úszás komfortjához",
+        swimWind: "a szél hullámossá teheti a nyílt vizet és nehezítheti a kijutást",
+        swimRain: "az eső ronthatja a láthatóságot és komfortot nyílt vízen",
+        workable: "az időjárás megfelelőnek tűnik a kiválasztott sporthoz",
+        noData: "nincs használható előrejelzés"
       }
     }
   };
@@ -478,12 +538,13 @@ const WeathermanApp = (() => {
     locateButton.addEventListener("click", useBrowserLocation);
     agriTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.AGRI, true));
     familyTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.FAMILY, true));
+    sportsTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.SPORTS, true));
 
     sectionAccordions.forEach(section => {
       section.addEventListener("toggle", saveSettings);
     });
 
-    [language, theme, crop, work].forEach(control => {
+    [language, theme, crop, work, sport].forEach(control => {
       control.addEventListener("change", () => {
         applyStaticText();
         applyTheme();
@@ -557,6 +618,7 @@ const WeathermanApp = (() => {
     forecastEl.innerHTML = "";
     agriEl.innerHTML = "";
     familyEl.innerHTML = "";
+    sportsEl.innerHTML = "";
     sourceComparisonEl.innerHTML = "";
     providersEl.innerHTML = "";
     sourcesEl.innerHTML = "";
@@ -587,6 +649,7 @@ const WeathermanApp = (() => {
     renderHourlyWork(usable);
     renderAgriculture(aggregate.days);
     renderFamily(aggregate.days);
+    renderSports(aggregate.days);
     renderProviders(results);
     renderSources(results);
   }
@@ -608,6 +671,7 @@ const WeathermanApp = (() => {
       if (selectHasValue(theme, settings.theme)) theme.value = settings.theme;
       if (selectHasValue(crop, settings.crop)) crop.value = settings.crop;
       if (selectHasValue(work, settings.work)) work.value = settings.work;
+      if (selectHasValue(sport, settings.sport)) sport.value = settings.sport;
       if (SUPPORTED_ADVISORY_DOMAINS.includes(settings.advisoryDomain)) setActiveDomain(settings.advisoryDomain);
       if (Array.isArray(settings.openSections)) applySectionState(settings.openSections);
       return true;
@@ -634,6 +698,7 @@ const WeathermanApp = (() => {
         theme: theme.value,
         crop: crop.value,
         work: work.value,
+        sport: sport.value,
         advisoryDomain: currentAdvisoryDomain(),
         openSections: sectionAccordions
           .filter(section => section.open)
@@ -726,6 +791,7 @@ const WeathermanApp = (() => {
     document.querySelector("#themeLabel").textContent = strings.theme;
     document.querySelector("#cropLabel").textContent = strings.crop;
     document.querySelector("#workLabel").textContent = strings.work;
+    document.querySelector("#sportLabel").textContent = strings.sport;
     refreshButton.innerHTML = `${iconMarkup("fa-rotate-right")} ${escapeHtml(strings.refresh)}`;
     locateButton.innerHTML = `${iconMarkup("fa-location-crosshairs")} ${escapeHtml(strings.locate)}`;
     updateToastText.textContent = strings.updateAvailable;
@@ -739,6 +805,7 @@ const WeathermanApp = (() => {
     document.querySelector("#advisoryTitle").innerHTML = `${iconMarkup("fa-clipboard-list")} ${escapeHtml(strings.advisories)}`;
     agriTab.innerHTML = `${iconMarkup("fa-seedling")} ${escapeHtml(strings.agriculture)}`;
     familyTab.innerHTML = `${iconMarkup("fa-people-roof")} ${escapeHtml(strings.family)}`;
+    sportsTab.innerHTML = `${iconMarkup("fa-person-running")} ${escapeHtml(strings.sports)}`;
     document.querySelector("#providersTitle").innerHTML = `${iconMarkup("fa-satellite-dish")} ${escapeHtml(strings.providers)}`;
     document.querySelector("#sourcesTitle").innerHTML = `${iconMarkup("fa-code")} ${escapeHtml(strings.sources)}`;
     document.querySelector("#footerText").textContent = strings.footerText;
@@ -746,13 +813,16 @@ const WeathermanApp = (() => {
     document.querySelector("#medianNote").textContent = strings.medianNote;
     document.querySelector("#agriNote").textContent = strings.agriNote;
     document.querySelector("#familyNote").textContent = strings.familyNote;
+    document.querySelector("#sportsNote").textContent = strings.sportsNote;
     updateThemeOptions();
     updateOptionLabels(crop, SUPPORTED_CROPS);
     updateOptionLabels(work, SUPPORTED_WORK);
+    updateOptionLabels(sport, SUPPORTED_SPORTS);
     sortSelectOptions(language, locale);
     sortSelectOptions(theme, locale);
     sortSelectOptions(crop, locale);
     sortSelectOptions(work, locale);
+    sortSelectOptions(sport, locale);
   }
 
   function updateThemeOptions() {
@@ -1105,21 +1175,26 @@ const WeathermanApp = (() => {
   // Advisory Heuristics
 
   function setActiveDomain(domain, persist = false) {
-    const familyActive = domain === ADVISORY_DOMAIN.FAMILY;
-    agriTab.classList.toggle("active", !familyActive);
-    familyTab.classList.toggle("active", familyActive);
-    agriTab.classList.toggle("tab-active", !familyActive);
-    familyTab.classList.toggle("tab-active", familyActive);
-    agriTab.setAttribute("aria-selected", String(!familyActive));
-    familyTab.setAttribute("aria-selected", String(familyActive));
-    agriPanel.hidden = familyActive;
-    familyPanel.hidden = !familyActive;
-    if (!familyActive && hourlyChart) hourlyChart.resize();
+    const panels = [
+      [ADVISORY_DOMAIN.AGRI, agriTab, agriPanel],
+      [ADVISORY_DOMAIN.FAMILY, familyTab, familyPanel],
+      [ADVISORY_DOMAIN.SPORTS, sportsTab, sportsPanel]
+    ];
+    panels.forEach(([key, tab, panel]) => {
+      const active = domain === key;
+      tab.classList.toggle("active", active);
+      tab.classList.toggle("tab-active", active);
+      tab.setAttribute("aria-selected", String(active));
+      panel.hidden = !active;
+    });
+    if (domain === ADVISORY_DOMAIN.AGRI && hourlyChart) hourlyChart.resize();
     if (persist) saveSettings();
   }
 
   function currentAdvisoryDomain() {
-    return familyTab.classList.contains("active") ? ADVISORY_DOMAIN.FAMILY : ADVISORY_DOMAIN.AGRI;
+    if (familyTab.classList.contains("active")) return ADVISORY_DOMAIN.FAMILY;
+    if (sportsTab.classList.contains("active")) return ADVISORY_DOMAIN.SPORTS;
+    return ADVISORY_DOMAIN.AGRI;
   }
 
   function evaluateFamily(day) {
@@ -1193,6 +1268,43 @@ const WeathermanApp = (() => {
       [strings.middaySun, uv >= 6 || high >= 30 || humidHeat ? strings.caution : strings.good],
       [strings.eveningWeather, low <= 8 || rain >= 1 ? strings.caution : strings.good]
     ];
+  }
+
+  function evaluateSports(day, sportKey) {
+    if (!day.sources) return { level: SCORE.POOR, reasons: ["noData"] };
+
+    const reasons = [];
+    let score = 0;
+    const rain = day.precip ?? 0;
+    const wind = day.wind ?? 0;
+    const high = day.high ?? 0;
+    const low = day.low ?? 99;
+    const humidHeat = high >= AGRI_LIMITS.HUMID_HEAT_STRESS_C && (day.humidity ?? 0) >= AGRI_LIMITS.HUMID_HEAT_PERCENT;
+
+    if (sportKey === SPORT.OPEN_WATER_SWIMMING) {
+      if (low < AGRI_LIMITS.SWIM_MIN_C) addReason("swimCold", 2);
+      if (wind >= AGRI_LIMITS.SWIM_WIND_POOR_KMH) addReason("swimWind", 3);
+      else if (wind >= AGRI_LIMITS.SWIM_WIND_CAUTION_KMH) addReason("swimWind", 1);
+      if (rain >= AGRI_LIMITS.SPORT_RAIN_CAUTION_MM) addReason("swimRain", 1);
+    } else {
+      if (rain >= AGRI_LIMITS.SPORT_RAIN_POOR_MM) addReason("heavyRain", 3);
+      else if (rain >= AGRI_LIMITS.SPORT_RAIN_CAUTION_MM) addReason("rain", 1);
+      if (wind >= AGRI_LIMITS.SPORT_WIND_POOR_KMH) addReason("wind", 3);
+      else if (wind >= AGRI_LIMITS.SPORT_WIND_CAUTION_KMH) addReason("wind", 1);
+      if (sportKey === SPORT.MOUNTAIN_BIKING && rain >= AGRI_LIMITS.SPORT_RAIN_CAUTION_MM) addReason("trailWet", 1);
+    }
+
+    if (high >= AGRI_LIMITS.SPORT_HOT_C || humidHeat) addReason("heat", 1);
+    if (low <= AGRI_LIMITS.SPORT_COLD_C && sportKey !== SPORT.OPEN_WATER_SWIMMING) addReason("cold", 1);
+    if (rain >= AGRI_LIMITS.SPORT_RAIN_CAUTION_MM && wind >= AGRI_LIMITS.SPORT_WIND_CAUTION_KMH) addReason("stormRisk", 1);
+
+    if (!reasons.length) return { level: SCORE.GOOD, reasons: ["workable"] };
+    return { level: score >= 4 ? SCORE.POOR : SCORE.CAUTION, reasons };
+
+    function addReason(reason, points) {
+      if (!reasons.includes(reason)) reasons.push(reason);
+      score += points;
+    }
   }
 
   function agriInputSummary(day, previousDays) {
@@ -1693,6 +1805,31 @@ const WeathermanApp = (() => {
           <dl>
             ${familySituationEntries(day).map(([label, value]) => `<dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd>`).join("")}
           </dl>
+        </article>
+      `;
+    }).join("");
+  }
+
+  function renderSports(days) {
+    const strings = t();
+    sportsEl.innerHTML = days.map(day => {
+      const evaluation = evaluateSports(day, sport.value);
+      return `
+        <article class="sports-card card bg-base-100 border border-base-300 shadow-sm">
+          <time datetime="${day.date}">${formatDate(day.date)}</time>
+          <h3>${escapeHtml(strings[sport.value])}</h3>
+          <span class="score badge ${scoreBadgeClass(evaluation.level)} ${evaluation.level}">${scoreIconMarkup(evaluation.level)} ${strings[evaluation.level]}</span>
+          <dl>
+            <dt>${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
+            <dt>${strings.highLow}</dt><dd>${formatTemp(day.high)} / ${formatTemp(day.low)}</dd>
+            <dt>${strings.humidity}</dt><dd>${formatPercent(day.humidity)}</dd>
+            <dt>${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
+            <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
+            <dt>${strings.uv}</dt><dd>${formatUv(day.uv)}</dd>
+          </dl>
+          <ul class="reasons">
+            ${evaluation.reasons.map(reason => `<li>${escapeHtml(strings.sportsReasons[reason])}</li>`).join("")}
+          </ul>
         </article>
       `;
     }).join("");

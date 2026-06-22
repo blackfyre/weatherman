@@ -297,7 +297,8 @@ section {
 
 .forecast-grid,
 .agri-grid,
-.family-grid {
+.family-grid,
+.sports-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
@@ -327,7 +328,8 @@ section {
 
 .day,
 .agri-card,
-.family-card {
+.family-card,
+.sports-card {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
