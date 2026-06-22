@@ -39,7 +39,8 @@ for (const [id, values] of Object.entries({
   place: ["47.58,18.88,Nagykovacsi", "custom"],
   language: ["en-GB", "hu-HU"],
   crop: ["rapeseed", "wheat", "barley", "corn", "sunflower"],
-  work: ["seeding", "harvesting", "spraying"]
+  work: ["seeding", "harvesting", "spraying"],
+  sport: ["hiking", "mountainBiking", "openWaterSwimming"]
 })) {
   elements[id].options = values.map(value => ({ value, textContent: "" }));
   elements[id].value = values[0];

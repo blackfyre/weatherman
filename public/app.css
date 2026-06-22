@@ -178,6 +178,7 @@ section {
   align-items: center;
   gap: 10px;
   line-height: 1.3;
+  padding-inline-end: 3.5rem;
 }
 
 .source-summary-name,
