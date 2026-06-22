@@ -321,12 +321,6 @@ section {
   margin-top: 8px;
 }
 
-.family-highlight button {
-  min-height: 34px;
-  padding: 0 10px;
-  font-size: 13px;
-}
-
 .day time {
   color: var(--muted);
   font-size: 13px;

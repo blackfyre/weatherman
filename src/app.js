@@ -153,7 +153,6 @@ const WeathermanApp = (() => {
   let lastResults = [];
   let lastAggregate = null;
   let hourlyChart = null;
-  let familyReminderTimer = null;
 
   const text = {
     [LOCALE.EN_GB]: {
@@ -255,12 +254,7 @@ const WeathermanApp = (() => {
       dress: "Dress",
       health: "Health risks",
       tomorrowFamily: "Tomorrow for the kids",
-      tomorrowSummary: (level, dress, health) => `${level}. ${dress}. ${health}.`,
-      remindAtSeven: "Notify at 19:00 while open",
-      reminderUnavailable: "Notifications are not available in this browser.",
-      reminderEnabled: "Reminder set for 19:00 while this app is open.",
-      reminderDenied: "Notification permission was not granted.",
-      reminderTitle: "Tomorrow's weather",
+      tomorrowSummary: (dress, health) => `${dress}. ${health}.`,
       good: "Good",
       caution: "Caution",
       poor: "Poor",
@@ -406,12 +400,7 @@ const WeathermanApp = (() => {
       dress: "Öltözet",
       health: "Egészségi kockázatok",
       tomorrowFamily: "Holnap a gyerekeknek",
-      tomorrowSummary: (level, dress, health) => `${level}. ${dress}. ${health}.`,
-      remindAtSeven: "Értesítés 19:00-kor, amíg nyitva van",
-      reminderUnavailable: "A böngésző nem támogatja az értesítéseket.",
-      reminderEnabled: "Emlékeztető beállítva 19:00-ra, amíg az app nyitva van.",
-      reminderDenied: "Az értesítési engedély nincs megadva.",
-      reminderTitle: "Holnapi időjárás",
+      tomorrowSummary: (dress, health) => `${dress}. ${health}.`,
       good: "Jó",
       caution: "Óvatosan",
       poor: "Nem ajánlott",
@@ -478,9 +467,6 @@ const WeathermanApp = (() => {
     locateButton.addEventListener("click", useBrowserLocation);
     agriTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.AGRI, true));
     familyTab.addEventListener("click", () => setActiveDomain(ADVISORY_DOMAIN.FAMILY, true));
-    familyHighlightEl.addEventListener("click", event => {
-      if (event.target.id === "familyReminder") enableFamilyReminder();
-    });
 
     sectionAccordions.forEach(section => {
       section.addEventListener("toggle", saveSettings);
@@ -1653,49 +1639,10 @@ const WeathermanApp = (() => {
           <time datetime="${tomorrow.date}">${formatDate(tomorrow.date)}</time>
           <h3>${escapeHtml(strings.tomorrowFamily)}</h3>
         </div>
-        <button class="btn btn-primary btn-sm" id="familyReminder" type="button">${iconMarkup("fa-bell")} ${escapeHtml(strings.remindAtSeven)}</button>
       </div>
       <span class="score badge ${scoreBadgeClass(advice.level)} ${advice.level}">${scoreIconMarkup(advice.level)} ${strings[advice.level]}</span>
-      <p>${escapeHtml(strings.tomorrowSummary(strings[advice.level], dress, health))}</p>
+      <p>${escapeHtml(strings.tomorrowSummary(dress, health))}</p>
     `;
-  }
-
-  async function enableFamilyReminder() {
-    const strings = t();
-    const button = document.querySelector("#familyReminder");
-    if (!("Notification" in window)) {
-      if (button) button.innerHTML = `${iconMarkup("fa-bell-slash")} ${escapeHtml(strings.reminderUnavailable)}`;
-      return;
-    }
-
-    const permission = Notification.permission === "granted"
-      ? "granted"
-      : await Notification.requestPermission();
-    if (permission !== "granted") {
-      if (button) button.innerHTML = `${iconMarkup("fa-bell-slash")} ${escapeHtml(strings.reminderDenied)}`;
-      return;
-    }
-
-    scheduleFamilyReminder();
-    if (button) button.innerHTML = `${iconMarkup("fa-bell")} ${escapeHtml(strings.reminderEnabled)}`;
-  }
-
-  function scheduleFamilyReminder() {
-    clearTimeout(familyReminderTimer);
-    familyReminderTimer = setTimeout(() => {
-      new Notification(t().reminderTitle, { body: familyReminderMessage() });
-      scheduleFamilyReminder();
-    }, msUntilNextReminder());
-  }
-
-  function familyReminderMessage() {
-    const strings = t();
-    const tomorrow = lastAggregate?.days.find(day => day.date === tomorrowDateKey());
-    if (!tomorrow) return strings.noData;
-    const advice = evaluateFamily(tomorrow);
-    const dress = advice.dress.map(reason => strings.familyReasons[reason]).join(", ");
-    const health = advice.health.map(reason => strings.familyReasons[reason]).join(", ");
-    return strings.tomorrowSummary(strings[advice.level], dress, health);
   }
 
   function renderProviders(results) {
@@ -1893,13 +1840,6 @@ const WeathermanApp = (() => {
 
   function tomorrowDateKey() {
     return budapestDateKey(new Date(Date.now() + 24 * 60 * 60 * 1000));
-  }
-
-  function msUntilNextReminder() {
-    const next = new Date();
-    next.setHours(19, 0, 0, 0);
-    if (next <= new Date()) next.setDate(next.getDate() + 1);
-    return next - new Date();
   }
 
   function budapestHourKey(date) {
