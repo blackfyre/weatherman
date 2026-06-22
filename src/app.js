@@ -2704,8 +2704,130 @@ const WeathermanApp = (() => {
     return "badge-error";
   }
 
+  // ADR boundary map: keep the static app dependency-free while making the
+  // single-file domains explicit enough to split later if a bundler is added.
+  const DomainBoundaries = Object.freeze({
+    applicationLifecycle: Object.freeze({
+      start,
+      registerServiceWorker,
+      showUpdateToast,
+      loadWeather,
+      renderAll,
+      rerenderCachedWeather
+    }),
+    clientInputs: Object.freeze({
+      loadSettings,
+      applySectionState,
+      saveSettings,
+      selectHasValue,
+      applyBrowserLocale,
+      useBrowserLocation,
+      readCoords,
+      parseCoords
+    }),
+    localisationAndTheme: Object.freeze({
+      t,
+      applyStaticText,
+      updateThemeOptions,
+      themeLabel,
+      applyTheme,
+      updateOptionLabels,
+      sortSelectOptions
+    }),
+    providerAdapters: Object.freeze({
+      openMeteoUrl,
+      fetchProvider,
+      parseProviderPayload,
+      providerErrorMessage,
+      normaliseOpenMeteo,
+      normaliseDailyUv,
+      normaliseMetNo
+    }),
+    forecastReadModels: Object.freeze({
+      buildAggregate,
+      dailyForProvider,
+      aggregateDay,
+      providerSpread,
+      rangeFor,
+      withForecastConfidence,
+      hourlyAggregate,
+      workWindows,
+      nearestCurrentTemp
+    }),
+    advisoryHeuristics: Object.freeze({
+      setActiveDomain,
+      currentAdvisoryDomain,
+      evaluateFamily,
+      familySituationEntries,
+      evaluateSports,
+      agriInputSummary,
+      evaluateAgriculture,
+      advisoryRain,
+      carryOverWetness,
+      dryingCredit
+    }),
+    visualEmbeds: Object.freeze({
+      updateMap
+    }),
+    rendering: Object.freeze({
+      renderStatus,
+      statusMessageMarkup,
+      renderToday,
+      renderForecastInsight,
+      renderForecast,
+      renderHourlyWork,
+      renderAgriculture,
+      renderFamily,
+      renderSports,
+      renderProviders,
+      renderSourceComparison,
+      renderSources
+    }),
+    forecastHistory: Object.freeze({
+      forecastHistoryKey,
+      loadForecastHistory,
+      saveForecastHistory
+    }),
+    utilities: Object.freeze({
+      median,
+      max,
+      min,
+      sum,
+      prevailingDirection,
+      valueAt,
+      numberOrNull,
+      budapestDateKey,
+      tomorrowDateKey,
+      budapestHourKey,
+      partsFor,
+      formatDate,
+      formatHour,
+      formatWindowRange,
+      formatWindDirection,
+      formatTemp,
+      formatTempDelta,
+      formatTempRange,
+      formatMm,
+      formatMmRange,
+      formatKmh,
+      formatKmhRange,
+      formatPercent,
+      formatUv,
+      formatConfidence,
+      formatFreshness,
+      forecastConfidenceColor,
+      changePhrase,
+      escapeHtml,
+      noteMarkup,
+      iconMarkup,
+      scoreIconMarkup,
+      scoreBadgeClass
+    })
+  });
+
   return Object.freeze({
-    start
+    start: DomainBoundaries.applicationLifecycle.start,
+    domains: DomainBoundaries
   });
 })();
 
