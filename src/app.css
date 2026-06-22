@@ -232,14 +232,6 @@ section {
   font-weight: 700;
 }
 
-.license-badge {
-  border: 1px solid var(--highlight-line);
-  border-radius: 999px;
-  padding: 3px 9px;
-  background: var(--highlight);
-  text-decoration: none;
-}
-
 .today-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
