@@ -1,7 +1,7 @@
 const WeathermanApp = (() => {
   const zone = "Europe/Budapest";
   const forecastDays = 5;
-  const openMeteoHourly = "temperature_2m,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover";
+  const openMeteoHourly = "temperature_2m,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m,cloud_cover";
   const openMeteoDaily = "uv_index_max,uv_index_clear_sky_max";
   const LOCALE = Object.freeze({
     EN_GB: "en-GB",
@@ -60,10 +60,14 @@ const WeathermanApp = (() => {
     SPRAY_WIND_CAUTION_KMH: 12,
     SPRAY_HEAT_POOR_C: 30,
     SPRAY_HEAT_CAUTION_C: 25,
+    SPRAY_LOW_HUMIDITY_PERCENT: 35,
     DRYING_WEAK_CLOUD_PERCENT: 75,
+    DRYING_WEAK_HUMIDITY_PERCENT: 85,
     WIND_POOR_KMH: 35,
     WIND_CAUTION_KMH: 22,
     HEAT_STRESS_C: 34,
+    HUMID_HEAT_STRESS_C: 30,
+    HUMID_HEAT_PERCENT: 70,
     SATURATED_WETNESS: 4,
     PARTIAL_DRYING_WETNESS: 2
   });
@@ -84,7 +88,7 @@ const WeathermanApp = (() => {
   const MAX_FORECAST_SNAPSHOTS = 6;
   const providerCache = new Map();
   // Provider adapters map raw API payloads into this canonical hourly shape:
-  // { key, date, temp, precip, wind, windDirection, cloud } with Budapest-local time and metric units.
+  // { key, date, temp, humidity, precip, wind, windDirection, cloud } with Budapest-local time and metric units.
   const providers = [
     {
       id: PROVIDER_ID.OPENMETEO,
@@ -197,7 +201,9 @@ const WeathermanApp = (() => {
       highLow: "High / low",
       dailyRange: "Median daily range",
       precipitation: "Precipitation",
+      humidity: "Humidity",
       dailyTotal: "Median daily total",
+      dailyMedian: "Median daily value",
       uv: "UV index",
       dailyUvMax: "Median daily max",
       uvClearSky: "clear sky",
@@ -265,8 +271,9 @@ const WeathermanApp = (() => {
         wetHarvest: "rain and wet crop risk are too high for harvest",
         sprayRain: "rain may wash spray off before it can work",
         sprayDrift: "wind increases spray drift risk",
+        sprayEvaporation: "low humidity can increase spray evaporation risk",
         sprayHeat: "heat can reduce spray accuracy and crop safety",
-        dryingWeak: "cloud cover suggests weak drying",
+        dryingWeak: "cloud cover or high humidity suggests weak drying",
         windPoor: "wind is too strong for accurate field operations",
         windCaution: "wind may affect machinery accuracy and losses",
         coldSensitive: "cold nights may slow emergence",
@@ -290,6 +297,7 @@ const WeathermanApp = (() => {
         uvHigh: "high UV; prefer shade and reduce late-morning to afternoon exposure",
         uvVeryHigh: "very high UV; keep children's midday outdoor time short",
         uvCloudBreaks: "cloud breaks could raise UV exposure quickly",
+        humidHeat: "humidity makes heat harder to tolerate",
         heatHydration: "heat can affect anyone; plan water and shade",
         heatReduceActivity: "reduce strenuous midday outdoor activity",
         checkVulnerable: "check children, older adults and people with chronic conditions",
@@ -343,7 +351,9 @@ const WeathermanApp = (() => {
       highLow: "Max / min",
       dailyRange: "Medián napi tartomány",
       precipitation: "Csapadék",
+      humidity: "Páratartalom",
       dailyTotal: "Medián napi összeg",
+      dailyMedian: "Medián napi érték",
       uv: "UV-index",
       dailyUvMax: "Medián napi maximum",
       uvClearSky: "derült égbolt",
@@ -411,8 +421,9 @@ const WeathermanApp = (() => {
         wetHarvest: "az eső és a nedves termény kockázata túl magas aratáshoz",
         sprayRain: "az eső lemoshatja a permetet, mielőtt hatna",
         sprayDrift: "a szél növeli az elsodródás kockázatát",
+        sprayEvaporation: "az alacsony páratartalom növelheti a párolgási kockázatot permetezéskor",
         sprayHeat: "a meleg ronthatja a permetezés pontosságát és a növénybiztonságot",
-        dryingWeak: "a felhőzet gyenge száradást jelez",
+        dryingWeak: "a felhőzet vagy magas páratartalom gyenge száradást jelez",
         windPoor: "a szél túl erős a pontos munkavégzéshez",
         windCaution: "a szél ronthatja a gépek pontosságát és növelheti a veszteséget",
         coldSensitive: "a hideg éjszakák lassíthatják a kelést",
@@ -436,6 +447,7 @@ const WeathermanApp = (() => {
         uvHigh: "magas UV; inkább árnyék és kevesebb késő délelőtti-délutáni kitettség",
         uvVeryHigh: "nagyon magas UV; a gyerekek déli kinti ideje legyen rövid",
         uvCloudBreaks: "a felhőzet felszakadozása gyorsan növelheti az UV-kitettséget",
+        humidHeat: "a páratartalom nehezíti a hőség elviselését",
         heatHydration: "a hőség bárkit érinthet; tervezzetek vízzel és árnyékkal",
         heatReduceActivity: "érdemes csökkenteni a megterhelő déli kinti aktivitást",
         checkVulnerable: "figyeljetek a gyerekekre, idősekre és krónikus betegekre",
@@ -866,6 +878,7 @@ const WeathermanApp = (() => {
       key: `${time.slice(0, 13)}:00`,
       date: time.slice(0, 10),
       temp: valueAt(hourly.temperature_2m, index),
+      humidity: valueAt(hourly.relative_humidity_2m, index),
       precip: valueAt(hourly.precipitation, index),
       wind: valueAt(hourly.wind_speed_10m, index),
       windDirection: valueAt(hourly.wind_direction_10m, index),
@@ -893,6 +906,7 @@ const WeathermanApp = (() => {
         key,
         date: key.slice(0, 10),
         temp: numberOrNull(details.air_temperature),
+        humidity: numberOrNull(details.relative_humidity),
         precip: numberOrNull(nextHour.precipitation_amount),
         wind: numberOrNull(details.wind_speed) === null ? null : details.wind_speed * 3.6,
         windDirection: numberOrNull(details.wind_from_direction),
@@ -926,6 +940,7 @@ const WeathermanApp = (() => {
       provider: result.provider.name,
       date,
       currentTemp: nearestCurrentTemp(hours),
+      humidity: median(hours.map(hour => hour.humidity)),
       high: max(hours.map(hour => hour.temp)),
       low: min(hours.map(hour => hour.temp)),
       precip: sum(hours.map(hour => hour.precip)),
@@ -947,6 +962,7 @@ const WeathermanApp = (() => {
       high: median(providerDays.map(day => day.high)),
       low: median(providerDays.map(day => day.low)),
       precip: median(providerDays.map(day => day.precip)),
+      humidity: median(providerDays.map(day => day.humidity)),
       wind: median(providerDays.map(day => day.wind)),
       windDirection: prevailingDirection(providerDays.map(day => day.windDirection)),
       cloud: median(providerDays.map(day => day.cloud)),
@@ -960,6 +976,7 @@ const WeathermanApp = (() => {
       high: rangeFor(providerDays.map(day => day.high)),
       low: rangeFor(providerDays.map(day => day.low)),
       precip: rangeFor(providerDays.map(day => day.precip)),
+      humidity: rangeFor(providerDays.map(day => day.humidity)),
       wind: rangeFor(providerDays.map(day => day.wind)),
       uv: rangeFor(providerDays.map(day => day.uv))
     };
@@ -1041,6 +1058,7 @@ const WeathermanApp = (() => {
         date: key.slice(0, 10),
         sources: hours.length,
         temp: median(hours.map(hour => hour.temp)),
+        humidity: median(hours.map(hour => hour.humidity)),
         precip: median(hours.map(hour => hour.precip)),
         wind: median(hours.map(hour => hour.wind)),
         windDirection: prevailingDirection(hours.map(hour => hour.windDirection)),
@@ -1057,6 +1075,7 @@ const WeathermanApp = (() => {
         date: slice[0].date,
         sources: max(slice.map(hour => hour.sources)),
         currentTemp: slice[0].temp,
+        humidity: median(slice.map(hour => hour.humidity)),
         high: max(slice.map(hour => hour.temp)),
         low: min(slice.map(hour => hour.temp)),
         precip: sum(slice.map(hour => hour.precip)),
@@ -1116,6 +1135,7 @@ const WeathermanApp = (() => {
     const rain = day.precip ?? 0;
     const wind = day.wind ?? 0;
     const cloud = day.cloud ?? 100;
+    const humidity = Number.isFinite(day.humidity) ? day.humidity : null;
     const uv = day.uv ?? day.uvClearSky ?? 0;
     const clearSkyUv = day.uvClearSky ?? 0;
 
@@ -1130,6 +1150,7 @@ const WeathermanApp = (() => {
 
     if (high >= 34) addHealth("heatReduceActivity", 3);
     else if (high >= 30) addHealth("heatHydration", 2);
+    if (high >= AGRI_LIMITS.HUMID_HEAT_STRESS_C && humidity >= AGRI_LIMITS.HUMID_HEAT_PERCENT) addHealth("humidHeat", 1);
     if (high >= 30) addHealth("checkVulnerable", 1);
     if (uv >= 8) addHealth("uvVeryHigh", 3);
     else if (uv >= 6) addHealth("uvHigh", 2);
@@ -1164,11 +1185,12 @@ const WeathermanApp = (() => {
     const wind = day.wind ?? 0;
     const high = day.high ?? 0;
     const low = day.low ?? 99;
+    const humidHeat = high >= AGRI_LIMITS.HUMID_HEAT_STRESS_C && (day.humidity ?? 0) >= AGRI_LIMITS.HUMID_HEAT_PERCENT;
     const uv = day.uv ?? day.uvClearSky ?? 0;
     return [
       [strings.schoolRun, rain >= 8 || wind >= 35 ? strings.caution : strings.good],
-      [strings.outdoorPlay, rain >= 3 || wind >= 35 || high >= 34 ? strings.caution : strings.good],
-      [strings.middaySun, uv >= 6 || high >= 30 ? strings.caution : strings.good],
+      [strings.outdoorPlay, rain >= 3 || wind >= 35 || high >= 34 || humidHeat ? strings.caution : strings.good],
+      [strings.middaySun, uv >= 6 || high >= 30 || humidHeat ? strings.caution : strings.good],
       [strings.eveningWeather, low <= 8 || rain >= 1 ? strings.caution : strings.good]
     ];
   }
@@ -1177,6 +1199,7 @@ const WeathermanApp = (() => {
     const wetness = carryOverWetness(previousDays, day);
     const inputs = [
       `${t().rain}: ${formatMm(day.precip)}`,
+      `${t().humidity}: ${formatPercent(day.humidity)}`,
       `${t().highLow}: ${formatTemp(day.high)} / ${formatTemp(day.low)}`,
       `${t().cloud}: ${formatPercent(day.cloud)}`,
       `${t().wetness}: ${wetness.toFixed(1)}`
@@ -1200,6 +1223,7 @@ const WeathermanApp = (() => {
     const high = day.high ?? 0;
     const low = day.low ?? 99;
     const cloud = day.cloud ?? 0;
+    const humidity = day.humidity ?? 0;
     const wetness = carryOverWetness(previousDays, day);
 
     if (workKey === WORK.SEEDING) {
@@ -1212,13 +1236,14 @@ const WeathermanApp = (() => {
     } else if (workKey === WORK.HARVESTING) {
       if (rain >= AGRI_LIMITS.HARVEST_RAIN_POOR_MM) addReason("wetHarvest", 3);
       else if (rain >= AGRI_LIMITS.HARVEST_RAIN_CAUTION_MM) addReason("rainCaution", 2);
-      if (cloud >= AGRI_LIMITS.DRYING_WEAK_CLOUD_PERCENT) addReason("dryingWeak", 1);
+      if (cloud >= AGRI_LIMITS.DRYING_WEAK_CLOUD_PERCENT || humidity !== null && humidity >= AGRI_LIMITS.DRYING_WEAK_HUMIDITY_PERCENT) addReason("dryingWeak", 1);
       if ([CROP.RAPESEED, CROP.WHEAT, CROP.BARLEY].includes(cropKey) && rain >= AGRI_LIMITS.HARVEST_RAIN_CAUTION_MM) addReason("cerealHarvest", 1);
     } else if (workKey === WORK.SPRAYING) {
       if (rain >= AGRI_LIMITS.SPRAY_RAIN_POOR_MM) addReason("sprayRain", 3);
       else if (rain >= AGRI_LIMITS.SPRAY_RAIN_CAUTION_MM) addReason("sprayRain", 1);
       if (wind >= AGRI_LIMITS.SPRAY_WIND_POOR_KMH) addReason("sprayDrift", 3);
       else if (wind >= AGRI_LIMITS.SPRAY_WIND_CAUTION_KMH) addReason("sprayDrift", 1);
+      if (humidity !== null && humidity <= AGRI_LIMITS.SPRAY_LOW_HUMIDITY_PERCENT && (high >= AGRI_LIMITS.SPRAY_HEAT_CAUTION_C || wind >= AGRI_LIMITS.SPRAY_WIND_CAUTION_KMH)) addReason("sprayEvaporation", 1);
       if (high >= AGRI_LIMITS.SPRAY_HEAT_POOR_C) addReason("sprayHeat", 3);
       else if (high >= AGRI_LIMITS.SPRAY_HEAT_CAUTION_C) addReason("sprayHeat", 1);
     }
@@ -1324,6 +1349,7 @@ const WeathermanApp = (() => {
     todayEl.innerHTML = [
       metricMarkup("fa-temperature-half", strings.now, formatTemp(day.currentTemp), strings.activeSources(sourceCount), comfortClassForTemp(day.currentTemp)),
       metricMarkup("fa-arrows-up-down", strings.highLow, `${formatTemp(day.high)} / ${formatTemp(day.low)}`, strings.dailyRange, comfortClassForDailyRange(day.high, day.low)),
+      metricMarkup("fa-droplet", strings.humidity, formatPercent(day.humidity), strings.dailyMedian, comfortClassForHumidity(day.humidity)),
       metricMarkup("fa-cloud-rain", strings.precipitation, formatMm(day.precip), strings.dailyTotal, comfortClassForRain(day.precip)),
       metricMarkup("fa-sun", strings.uv, formatUv(day.uv), `${strings.dailyUvMax} · ${strings.uvClearSky}: ${formatUv(day.uvClearSky)}`, comfortClassForUv(day.uv)),
       metricMarkup("fa-wind", strings.wind, formatKmh(day.wind), `${strings.dailyMax} · ${formatWindDirection(day.windDirection)}`, comfortClassForWind(day.wind))
@@ -1348,6 +1374,13 @@ const WeathermanApp = (() => {
     if (!Number.isFinite(rain)) return "";
     if (rain < 1) return "comfort-good";
     if (rain < 8) return "comfort-caution";
+    return "comfort-poor";
+  }
+
+  function comfortClassForHumidity(humidity) {
+    if (!Number.isFinite(humidity)) return "";
+    if (humidity >= 40 && humidity <= 70) return "comfort-good";
+    if (humidity >= 30 && humidity <= 80) return "comfort-caution";
     return "comfort-poor";
   }
 
@@ -1432,6 +1465,7 @@ const WeathermanApp = (() => {
         <dl>
           <dt>${iconMarkup("fa-gauge-high")} ${strings.confidence}</dt><dd>${formatConfidence(day.confidence)}</dd>
           <dt>${iconMarkup("fa-cloud-rain")} ${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
+          <dt>${iconMarkup("fa-droplet")} ${strings.humidity}</dt><dd>${formatPercent(day.humidity)}</dd>
           <dt>${iconMarkup("fa-sun")} ${strings.uv}</dt><dd>${formatUv(day.uv)}</dd>
           <dt>${iconMarkup("fa-wind")} ${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
           <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
@@ -1617,6 +1651,7 @@ const WeathermanApp = (() => {
           <span class="score badge ${scoreBadgeClass(evaluation.level)} ${evaluation.level}">${scoreIconMarkup(evaluation.level)} ${strings[evaluation.level]}</span>
           <dl>
             <dt>${strings.rain}</dt><dd>${formatMm(day.precip)}</dd>
+            <dt>${strings.humidity}</dt><dd>${formatPercent(day.humidity)}</dd>
             <dt>${strings.highLow}</dt><dd>${formatTemp(day.high)} / ${formatTemp(day.low)}</dd>
             <dt>${strings.wind}</dt><dd>${formatKmh(day.wind)}</dd>
             <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(day.windDirection)}</dd>
@@ -1678,6 +1713,7 @@ const WeathermanApp = (() => {
             <dt>${strings.high}</dt><dd>${formatTemp(today?.high)}</dd>
             <dt>${strings.low}</dt><dd>${formatTemp(today?.low)}</dd>
             <dt>${strings.rain}</dt><dd>${formatMm(today?.precip)}</dd>
+            <dt>${strings.humidity}</dt><dd>${formatPercent(today?.humidity)}</dd>
             <dt>${strings.uv}</dt><dd>${formatUv(today?.uv)}</dd>
             <dt>${strings.wind}</dt><dd>${formatKmh(today?.wind)}</dd>
             <dt>${strings.rulingWindDirection}</dt><dd>${formatWindDirection(today?.windDirection)}</dd>
@@ -1707,6 +1743,7 @@ const WeathermanApp = (() => {
               <th>${escapeHtml(strings.high)}</th>
               <th>${escapeHtml(strings.low)}</th>
               <th>${escapeHtml(strings.rain)}</th>
+              <th>${escapeHtml(strings.humidity)}</th>
               <th>${escapeHtml(strings.wind)}</th>
               <th>${escapeHtml(strings.uv)}</th>
             </tr>
@@ -1718,6 +1755,7 @@ const WeathermanApp = (() => {
                 <td>${formatTemp(day.high)}</td>
                 <td>${formatTemp(day.low)}</td>
                 <td>${formatMm(day.precip)}</td>
+                <td>${formatPercent(day.humidity)}</td>
                 <td>${formatKmh(day.wind)}</td>
                 <td>${formatUv(day.uv)}</td>
               </tr>
@@ -1755,6 +1793,7 @@ const WeathermanApp = (() => {
     return [
       metricMarkup("fa-temperature-half", strings.now, "...", strings.loading(providers.length)),
       metricMarkup("fa-arrows-up-down", strings.highLow, "...", strings.loading(providers.length)),
+      metricMarkup("fa-droplet", strings.humidity, "...", strings.loading(providers.length)),
       metricMarkup("fa-cloud-rain", strings.precipitation, "...", strings.loading(providers.length)),
       metricMarkup("fa-sun", strings.uv, "...", strings.loading(providers.length)),
       metricMarkup("fa-wind", strings.wind, "...", strings.loading(providers.length))
@@ -1792,7 +1831,7 @@ const WeathermanApp = (() => {
       const snapshots = loadForecastHistory(coords);
       snapshots.unshift({
         fetchedAt: new Date().toISOString(),
-        days: days.map(({ date, high, low, precip, wind, cloud, uv, uvClearSky, sources }) => ({ date, high, low, precip, wind, cloud, uv, uvClearSky, sources }))
+        days: days.map(({ date, high, low, humidity, precip, wind, cloud, uv, uvClearSky, sources }) => ({ date, high, low, humidity, precip, wind, cloud, uv, uvClearSky, sources }))
       });
       localStorage.setItem(forecastHistoryKey(coords), JSON.stringify(snapshots.slice(0, MAX_FORECAST_SNAPSHOTS)));
     } catch {
